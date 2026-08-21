@@ -1,0 +1,2003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Grünewald Brunch — Order Pad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<!-- Firebase (used only to broadcast sent orders to the kitchen station
+     phones — see kitchen-display.html). Everything else in this file
+     works exactly as before even if this is left unconfigured. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --cream:#FBF6EC;
+    --paper:#FFFFFF;
+    --ink:#2B2B24;
+    --ink-soft:#6B6A5E;
+    --forest:#2F4A3D;
+    --forest-dark:#20342A;
+    --coral:#E2895A;
+    --coral-dark:#C96F42;
+    --yolk:#EFB93F;
+    --line:#E7E0D0;
+    --sage:#DCE6DA;
+    --danger:#B5493A;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--yolk); color:var(--ink);}
+
+  /* ---------- Header ---------- */
+  header.top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:8px 16px;
+    background:var(--paper);
+    color:var(--ink);
+    border-bottom:1px solid var(--line);
+    position:static;
+  }
+  .table-badge{
+    display:flex;
+    align-items:baseline;
+    gap:6px;
+    line-height:1.2;
+  }
+  .table-badge .tb-label{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    letter-spacing:1px;
+  }
+  .table-badge .tb-value{
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:20px;
+    color:var(--forest-dark);
+  }
+  .switch-table-btn{
+    background:var(--sage);
+    border:1px solid var(--line);
+    color:var(--forest-dark);
+    padding:7px 14px;
+    border-radius:8px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .switch-table-btn:hover{ background:#CBDBC7; }
+
+  /* ---------- Layout ---------- */
+  .app{
+    display:grid;
+    grid-template-columns:1fr 340px;
+    gap:0;
+    min-height:100vh;
+  }
+
+  /* ---------- Food / Drinks swipeable pages ---------- */
+  .pages-viewport{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+  }
+  .page-tabs{
+    position:sticky;
+    top:0;
+    z-index:36;
+    display:flex;
+    background:var(--paper);
+    border-bottom:1px solid var(--line);
+  }
+  .page-tab{
+    flex:1;
+    border:none;
+    background:none;
+    padding:12px 10px;
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:14.5px;
+    color:var(--ink-soft);
+    cursor:pointer;
+    border-bottom:3px solid transparent;
+    transition:color .15s, border-color .15s;
+  }
+  .page-tab.active{
+    color:var(--forest-dark);
+    border-bottom-color:var(--coral);
+  }
+  .pages-clip{
+    overflow:hidden;
+  }
+  .pages-track{
+    display:flex;
+    width:200%;
+    transition:transform .28s ease;
+  }
+  .page-panel{
+    width:50%;
+    flex-shrink:0;
+    min-width:0;
+  }
+
+  /* ---------- Filter pills ---------- */
+  .filter-bar{
+    position:sticky;
+    top:44px;
+    z-index:30;
+    background:var(--cream);
+    padding:16px 26px 10px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .filter-pill{
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink-soft);
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:14.5px;
+    padding:9px 17px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  .filter-pill:hover{ border-color:var(--forest); color:var(--forest-dark); }
+  .filter-pill.active{
+    background:var(--forest);
+    border-color:var(--forest);
+    color:var(--cream);
+  }
+
+  /* ---------- Menu column ---------- */
+  main.menu{
+    padding:18px 26px 120px;
+    overflow-x:hidden;
+  }
+  .search-row{
+    display:flex;
+    gap:10px;
+    margin-bottom:20px;
+  }
+  .search-row input{
+    flex:1;
+    padding:11px 14px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    font-family:'Inter',sans-serif;
+    font-size:15.5px;
+    color:var(--ink);
+  }
+  .search-row input:focus{ outline:2px solid var(--coral); outline-offset:1px; }
+
+  section.category-block{ margin-bottom:34px; scroll-margin-top:130px; }
+  .category-head{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+    margin-bottom:4px;
+    padding-bottom:8px;
+    border-bottom:2px solid var(--forest);
+  }
+  .category-head h2{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:18px;
+    margin:0;
+    color:var(--forest-dark);
+  }
+  .category-note{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    margin:6px 0 14px;
+  }
+
+  .item-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
+    gap:12px;
+  }
+  .item-card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px 14px 12px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    transition:box-shadow .15s, transform .15s;
+  }
+  .item-card:hover{ box-shadow:0 4px 16px rgba(47,74,61,.1); }
+  .item-top{ display:flex; justify-content:space-between; gap:8px; align-items:flex-start;}
+  .item-name{ font-family:'Fraunces',serif; font-weight:600; font-size:17px; color:var(--ink); line-height:1.28;}
+  .tag{
+    display:inline-block;
+    font-family:'Space Mono',monospace;
+    font-size:10px;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+    padding:2px 7px;
+    border-radius:5px;
+    background:var(--sage);
+    color:var(--forest-dark);
+    width:fit-content;
+  }
+  .card-bottom{
+    margin-top:auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+  .customize-icon-btn{
+    width:32px; height:32px;
+    flex-shrink:0;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--sage);
+    color:var(--forest-dark);
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s;
+  }
+  .customize-icon-btn:hover{ background:#CBDBC7; }
+
+  /* qty stepper on card — kept narrow and pushed to the right via
+     card-bottom's space-between, so it doesn't compete visually with
+     the customize icon on the left. */
+  .qty-stepper{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    background:var(--cream);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:3px 4px;
+    margin-left:auto;
+  }
+  .step-btn{
+    width:32px; height:32px;
+    border-radius:50%;
+    border:none;
+    background:var(--forest);
+    color:var(--cream);
+    font-family:'Space Mono',monospace;
+    font-size:17px;
+    line-height:1;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s;
+    flex-shrink:0;
+  }
+  .step-btn:hover{ background:var(--forest-dark); }
+  .step-btn.minus:disabled{ background:#CFC8B6; cursor:not-allowed; }
+  .step-val{
+    font-family:'Space Mono',monospace;
+    font-size:14px;
+    font-weight:700;
+    min-width:16px;
+    text-align:center;
+    color:var(--ink);
+  }
+
+  /* A card lights up yellow the moment any quantity of that dish is
+     on the ticket — a quick visual flag for "this is being ordered",
+     independent of exactly how many/which configuration. */
+  .item-card.in-order{
+    background:var(--yolk);
+    border-color:#D9A61E;
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--ink-soft);
+    font-size:14px;
+    line-height:1.6;
+  }
+  .empty-state .big{ font-size:32px; display:block; margin-bottom:10px; }
+
+  /* ---------- Order ticket ---------- */
+  aside.ticket{
+    border-left:1px solid var(--line);
+    background:var(--paper);
+    position:sticky;
+    top:0;
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+  .ticket-head{
+    padding:14px 18px 10px;
+    border-bottom:1px dashed var(--line);
+  }
+  .ticket-head h3{
+    font-family:'Fraunces',serif;
+    margin:0 0 2px;
+    font-size:18px;
+    color:var(--forest-dark);
+  }
+  .ticket-head .meta{
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  .ticket-guest-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:10px;
+  }
+  .ticket-guest-row label{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+  }
+  .ticket-guest-row input{
+    width:52px;
+    padding:5px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-family:'Space Mono',monospace;
+    font-size:13px;
+  }
+  .move-table-link{
+    background:none;
+    border:none;
+    color:var(--coral-dark);
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:12px;
+    text-decoration:underline;
+    cursor:pointer;
+    padding:0;
+    margin-top:8px;
+    display:block;
+  }
+  .ticket-items{
+    flex:1;
+    overflow-y:auto;
+    padding:10px 18px;
+  }
+  .ticket-empty{
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:13px;
+    margin-top:40px;
+    padding:0 20px;
+    line-height:1.5;
+  }
+  .ticket-line{
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .ticket-line:last-child{ border-bottom:none; }
+  .tl-top{ display:flex; justify-content:space-between; gap:8px; }
+  .tl-name{ font-weight:600; font-size:15.5px; color:var(--ink); }
+  .tl-price{ font-family:'Space Mono',monospace; font-size:15px; color:var(--forest-dark); font-weight:700; white-space:nowrap;}
+  .tl-mods{ font-size:13px; color:var(--ink-soft); margin-top:2px; line-height:1.4;}
+  .tl-controls{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-top:8px;
+  }
+  .qty-group{ display:flex; align-items:center; gap:8px; }
+  .qty-btn{
+    width:28px; height:28px;
+    border-radius:7px;
+    border:1px solid var(--line);
+    background:var(--cream);
+    cursor:pointer;
+    font-family:'Space Mono',monospace;
+    font-size:16px;
+    line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ink);
+  }
+  .qty-btn:hover{ background:var(--sage); }
+  .qty-val{ font-family:'Space Mono',monospace; font-size:15px; min-width:18px; text-align:center;}
+  .remove-btn{
+    background:none;
+    border:none;
+    color:var(--danger);
+    font-size:13px;
+    cursor:pointer;
+    text-decoration:underline;
+    font-family:'Inter',sans-serif;
+  }
+
+  .ticket-footer{
+    border-top:1px dashed var(--line);
+    padding:14px 18px 18px;
+  }
+  .totals-row{
+    display:flex;
+    justify-content:space-between;
+    font-family:'Space Mono',monospace;
+    font-size:14px;
+    color:var(--ink-soft);
+    margin-bottom:4px;
+  }
+  .totals-row.grand{
+    font-size:19px;
+    color:var(--ink);
+    font-weight:700;
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px solid var(--line);
+  }
+  .send-btn{
+    width:100%;
+    margin-top:14px;
+    background:var(--coral);
+    color:#fff;
+    border:none;
+    padding:14px;
+    border-radius:10px;
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:16px;
+    letter-spacing:.2px;
+    cursor:pointer;
+    transition:background .15s;
+  }
+  .send-btn:hover{ background:var(--coral-dark); }
+  .send-btn:disabled{ background:#D8CFBE; cursor:not-allowed; }
+  .clear-btn{
+    width:100%;
+    margin-top:8px;
+    background:none;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+    padding:10px;
+    border-radius:10px;
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    cursor:pointer;
+  }
+  .clear-btn:hover{ background:var(--cream); }
+
+  /* ---------- Modifier modal ---------- */
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(32,52,42,.45);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    padding:20px;
+  }
+  .overlay.open{ display:flex; }
+  .modal{
+    background:var(--paper);
+    border-radius:16px;
+    width:100%;
+    max-width:420px;
+    max-height:85vh;
+    overflow-y:auto;
+    padding:22px;
+  }
+  .modal h3{
+    font-family:'Fraunces',serif;
+    font-size:18px;
+    margin:0 0 2px;
+    color:var(--forest-dark);
+  }
+  .modal .modal-desc{ font-size:14px; color:var(--ink-soft); margin-bottom:12px; line-height:1.4;}
+  .modal .group-title{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--forest-dark);
+    margin:14px 0 8px;
+  }
+  .modal-qty-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--cream);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px 12px;
+  }
+  .modal-qty-row .qty-label{ font-size:13px; font-weight:600; color:var(--ink); }
+  .modal-qty-row .qty-group{ display:flex; align-items:center; gap:12px; }
+  .modal-qty-row .qty-btn{
+    width:26px; height:26px;
+    border-radius:50%;
+    border:none;
+    background:var(--forest);
+    color:var(--cream);
+    font-family:'Space Mono',monospace;
+    font-size:15px;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .modal-qty-row .qty-btn:hover{ background:var(--forest-dark); }
+  .modal-qty-row .qty-val{ font-family:'Space Mono',monospace; font-size:14px; font-weight:700; min-width:16px; text-align:center; }
+
+  .unit-block{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:12px 14px 14px;
+    margin-top:14px;
+    background:var(--cream);
+  }
+  .unit-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:2px;
+  }
+  .unit-head .unit-title{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:16px;
+    color:var(--forest-dark);
+  }
+  .unit-copy-link{
+    background:none;
+    border:none;
+    color:var(--coral-dark);
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    text-decoration:underline;
+    cursor:pointer;
+    padding:0;
+  }
+  .unit-block .group-title{ margin:12px 0 7px; font-size:11px; }
+  .unit-block .opt-row{ padding:10px 12px; margin-bottom:8px; font-size:18px; }
+  .unit-block textarea{ margin-top:4px; min-height:40px; font-size:15px; }
+  .unit-price-tag{
+    font-family:'Space Mono',monospace;
+    font-size:13px;
+    color:var(--coral-dark);
+    font-weight:700;
+  }
+  .opt-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:11px 12px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    margin-bottom:8px;
+    cursor:pointer;
+    font-size:18px;
+  }
+  .opt-row input{
+    margin-right:10px;
+    width:18px;
+    height:18px;
+    accent-color:var(--forest);
+    flex-shrink:0;
+  }
+  .opt-row .opt-price{ font-family:'Space Mono',monospace; font-size:14px; color:var(--ink-soft); }
+  .opt-row.checked{ border-color:var(--forest); background:var(--sage); }
+  .opt-row.allergy.checked{ border-color:var(--danger); background:#FBEAE6; }
+  .opt-row.choice.checked{ border-color:var(--coral); background:#FBEBE0; }
+  .group-required{
+    font-family:'Inter',sans-serif;
+    font-size:10.5px;
+    font-weight:600;
+    color:var(--coral-dark);
+    margin-left:6px;
+    text-transform:none;
+    letter-spacing:0;
+  }
+  .modal textarea{
+    width:100%;
+    margin-top:6px;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    resize:vertical;
+    min-height:50px;
+  }
+  .modal-footer{
+    display:flex;
+    gap:10px;
+    margin-top:18px;
+  }
+  .modal-footer button{
+    flex:1;
+    padding:11px;
+    border-radius:10px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    cursor:pointer;
+    border:none;
+  }
+  .modal-cancel{ background:var(--cream); color:var(--ink-soft); border:1px solid var(--line) !important;}
+  .modal-confirm{ background:var(--forest); color:var(--cream); }
+  .modal-price-live{ font-family:'Space Mono',monospace; }
+
+  /* ---------- Toast ---------- */
+  .toast{
+    position:fixed;
+    bottom:22px;
+    left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--forest-dark);
+    color:var(--cream);
+    padding:12px 20px;
+    border-radius:10px;
+    font-size:13.5px;
+    font-family:'Inter',sans-serif;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s, transform .25s;
+    z-index:200;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* ---------- Table select screen ---------- */
+  .table-select-screen{
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:40px 20px 60px;
+  }
+  .tss-header{
+    text-align:center;
+    margin-bottom:28px;
+  }
+  .tss-header .mark{
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:18px;
+    color:var(--forest-dark);
+  }
+  .tss-header .sub{
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    margin-top:4px;
+  }
+  .tss-prompt{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    color:var(--ink);
+    margin:18px 0 14px;
+  }
+  .table-grid{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:12px;
+    width:100%;
+    max-width:480px;
+  }
+  .table-btn{
+    position:relative;
+    aspect-ratio:1;
+    border:1px solid var(--line);
+    background:var(--paper);
+    border-radius:14px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:20px;
+    color:var(--ink);
+    transition:transform .1s, box-shadow .15s, border-color .15s;
+  }
+  .table-btn:hover{ box-shadow:0 4px 14px rgba(47,74,61,.12); }
+  .table-btn:active{ transform:scale(.96); }
+  .table-btn:disabled{
+    opacity:.4;
+    cursor:not-allowed;
+    box-shadow:none;
+  }
+  .table-btn .tb-sub{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-top:2px;
+  }
+  .table-btn.has-order{
+    border-color:var(--coral);
+    background:#FFF6EF;
+  }
+  .table-btn.has-order .tb-sub{ color:var(--coral-dark); font-weight:700; }
+  .table-btn .tb-count{
+    position:absolute;
+    top:-8px; right:-8px;
+    background:var(--coral);
+    color:#fff;
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    font-weight:700;
+    min-width:22px;
+    height:22px;
+    border-radius:11px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0 5px;
+    box-shadow:0 2px 6px rgba(0,0,0,.2);
+  }
+  .custom-table-row{
+    display:flex;
+    gap:10px;
+    margin-top:22px;
+    width:100%;
+    max-width:480px;
+  }
+  .custom-table-row input{
+    flex:1;
+    padding:12px 14px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+  }
+  .custom-table-row button{
+    background:var(--forest);
+    color:var(--cream);
+    border:none;
+    padding:12px 20px;
+    border-radius:10px;
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .custom-table-row button:hover{ background:var(--forest-dark); }
+
+  #orderScreen{ display:none; }
+
+  /* ---------- Mobile ---------- */
+  .cart-toggle{ display:none; }
+  @media (max-width: 980px){
+    .app{ grid-template-columns:1fr; }
+    .filter-bar{ padding:12px 14px 8px; top:44px; }
+    .page-tab{ font-size:13px; padding:11px 8px; }
+    aside.ticket{
+      position:fixed;
+      bottom:0; left:0; right:0;
+      top:auto;
+      height:auto;
+      max-height:0;
+      overflow:hidden;
+      border-left:none;
+      border-top:1px solid var(--line);
+      border-radius:16px 16px 0 0;
+      box-shadow:0 -6px 24px rgba(0,0,0,.15);
+      transition:max-height .25s ease;
+      z-index:60;
+    }
+    aside.ticket.open{ max-height:85vh; overflow-y:auto; }
+    .cart-toggle{
+      display:flex;
+      position:fixed;
+      bottom:16px; right:16px;
+      z-index:70;
+      background:var(--coral);
+      color:#fff;
+      border:none;
+      padding:14px 18px;
+      border-radius:30px;
+      font-family:'Inter',sans-serif;
+      font-weight:700;
+      font-size:14px;
+      align-items:center;
+      gap:8px;
+      box-shadow:0 8px 20px rgba(0,0,0,.25);
+      cursor:pointer;
+    }
+    main.menu{ padding-bottom:100px; }
+
+    /* Two dishes side by side (e.g. Pancake Bouquet / Just Pancake)
+       instead of one full-width card per row. */
+    .item-grid{
+      grid-template-columns: repeat(2, 1fr);
+      gap:10px;
+    }
+    .item-card{
+      padding:11px 10px 10px;
+      gap:6px;
+    }
+    .item-name{ font-size:15px; line-height:1.25; }
+    .tag{ font-size:9.5px; padding:2px 6px; }
+    .card-bottom{ gap:6px; }
+    .qty-stepper{ padding:3px 4px; gap:4px; }
+  }
+
+  /* Below ~360px (small phones in portrait), drop to one column so
+     text doesn't get too cramped. */
+  @media (max-width: 360px){
+    .item-grid{ grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="table-select-screen" id="tableSelectScreen">
+  <div class="tss-header">
+    <div class="mark">Grünewald Brunch</div>
+    <div class="sub">Waiter Order Pad</div>
+  </div>
+  <div class="tss-prompt" id="tssPrompt">Select a table to start the order</div>
+  <div class="table-grid" id="tableGrid"></div>
+  <div class="custom-table-row">
+    <input type="text" id="customTableInput" placeholder="Other table / area (e.g. Patio 3)">
+    <button id="customTableBtn">Go</button>
+  </div>
+</div>
+
+<div id="orderScreen">
+<header class="top">
+  <div class="table-badge">
+    <span class="tb-label">Table</span>
+    <span class="tb-value" id="activeTableLabel">—</span>
+  </div>
+  <button class="switch-table-btn" id="switchTableBtn">Switch table</button>
+</header>
+
+<div class="app">
+  <div class="pages-viewport" id="pagesViewport">
+    <div class="page-tabs">
+      <button class="page-tab active" data-page="food">🍽️ Food</button>
+      <button class="page-tab" data-page="drinks">🥤 Drinks</button>
+    </div>
+    <div class="pages-clip">
+      <div class="pages-track" id="pagesTrack">
+        <section class="page-panel">
+          <div class="filter-bar" id="filterBar"></div>
+          <main class="menu">
+            <div class="search-row">
+              <input type="text" id="searchBox" placeholder="Search dishes…">
+            </div>
+            <div id="menuContainer"></div>
+          </main>
+        </section>
+        <section class="page-panel">
+          <div class="filter-bar" id="drinksFilterBar"></div>
+          <main class="menu">
+            <div class="search-row">
+              <input type="text" id="drinksSearchBox" placeholder="Search drinks…">
+            </div>
+            <div id="drinksContainer"></div>
+          </main>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <aside class="ticket" id="ticketPanel">
+    <div class="ticket-head">
+      <h3>Order Ticket</h3>
+      <div class="meta" id="ticketMeta">No table selected</div>
+      <div class="ticket-guest-row">
+        <label for="guestCount">Guests</label>
+        <input id="guestCount" type="text" placeholder="2" />
+      </div>
+      <button class="move-table-link" id="moveTableBtn">🔀 Move this order to another table</button>
+    </div>
+    <div class="ticket-items" id="ticketItems">
+      <div class="ticket-empty">Tap a dish to add it here.<br>Build the order, then send it to the kitchen.</div>
+    </div>
+    <div class="ticket-footer">
+      <div class="totals-row"><span>Items</span><span id="totalItems">0</span></div>
+      <div class="totals-row grand"><span>Total</span><span id="totalPrice">0,00€</span></div>
+      <button class="send-btn" id="sendBtn" disabled>Send order to kitchen</button>
+      <button class="clear-btn" id="clearBtn">Clear order</button>
+    </div>
+  </aside>
+</div>
+
+<button class="cart-toggle" id="cartToggle">🧾 Ticket <span id="cartToggleCount">0</span></button>
+</div><!-- /#orderScreen -->
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modalBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------------------------------------------------------
+   MENU DATA
+   group: "pancake" | "bowl" | "drink" | "food"  -> drives the top filters
+--------------------------------------------------------------- */
+const ALLERGY_FLAGS = [
+  {label:"Gluten allergy", price:0},
+  {label:"Nut allergy", price:0},
+  {label:"Dairy allergy", price:0},
+  {label:"Egg allergy", price:0}
+];
+
+// Shared choice lists reused by the per-person Special Menu dishes below.
+const SMOOTHIE_CHOICES = [
+  {label:"Purple Power Bowl smoothie (Açaí)", price:0},
+  {label:"Sunshine Bowl smoothie (Mango)", price:0},
+  {label:"Blue Lagoon smoothie (Banana-Pineapple-Mango-Spirulina)", price:0},
+  {label:"Grünewald Matcha smoothie", price:0},
+];
+const JUICE_CHOICES_02L = [
+  {label:"Apple Juice 0.2l", price:0},
+  {label:"Orange Juice 0.2l", price:0},
+];
+const JUICE_CHOICES_04L = [
+  {label:"Apple Juice 0.4l", price:0},
+  {label:"Orange Juice 0.4l", price:0},
+];
+const WARM_DRINK_CHOICES = [
+  {label:"Cappuccino", price:0},
+  {label:"Americano", price:0},
+];
+const EGGCELLENT_KETO_CHOICES = [
+  {label:"The Sunny Stack", price:0},
+  {label:"Sunrise Bliss", price:0},
+  {label:"Granny's Love", price:0},
+  {label:"Eggo-Cardo", price:0},
+  {label:"Keto Fuel Scramble", price:0},
+  {label:"Modest Keto", price:0},
+  {label:"Keto is King", price:0},
+];
+
+const MENU = [
+  {
+    id:"sweet",
+    name:"Sweet Brunch",
+    items:[
+      {
+        name:"The Pancake Bouquet",
+        desc:"Low-fat pancakes, maple syrup, apple sauce, fresh fruit.",
+        price:14.90, group:"pancake",
+        options:[{label:"Gluten free (from 1PM only)", price:0}],
+        extras:[
+          {label:"Made in Ghee", price:1.50},
+          {label:"Small cup of organic maple syrup", price:1.50}
+        ]
+      },
+      {
+        name:"Just Pancake",
+        desc:"Low-fat pancakes, maple syrup.",
+        price:10.90, group:"pancake",
+        options:[{label:"Gluten free (from 1PM only)", price:0}],
+        extras:[
+          {label:"Made in Ghee", price:1.50},
+          {label:"Small cup of organic maple syrup", price:1.50}
+        ]
+      },
+      { name:"Purple Power Bowl", desc:"Bio-Açaí Smoothie Bowl.", price:11.90, group:"bowl", tag:"vegan" },
+      { name:"Sunshine Bowl", desc:"Bio-Mango Smoothie Bowl.", price:11.90, group:"bowl", tag:"vegan" },
+      { name:"Blue Lagoon Bowl", desc:"Banana-Pineapple-Mango-Spirulina.", price:11.90, group:"bowl", tag:"vegan" },
+      { name:"Grünewald Matcha Bowl", desc:"Banana, mango, dates, avocado, matcha.", price:11.90, group:"bowl", tag:"vegan" },
+    ]
+  },
+  {
+    id:"eggcellent",
+    name:"Eggcellent Brunch",
+    items:[
+      { name:"The Sunny Stack", desc:"3 scrambled eggs on bread, leafy greens.", price:9.20, group:"food",
+        options:[{label:"Gluten-free bread (not toasted)", price:1.90}],
+        extras:[{label:"Made in Ghee", price:1.50}],
+        addons:[{label:"Smoked Salmon", price:2.90},{label:"Chicken Salami", price:2.00},{label:"Mild-nutty cheese", price:1.50}] },
+      { name:"Sunrise Bliss", desc:"Croissant, 3 scrambled eggs, leafy greens.", price:10.20, group:"food",
+        options:[{label:"Gluten-free bread (not toasted)", price:1.90}],
+        extras:[{label:"Made in Ghee", price:1.50}],
+        addons:[{label:"Smoked Salmon", price:2.90},{label:"Chicken Salami", price:2.00},{label:"Mild-nutty cheese", price:1.50}] },
+      { name:"Granny's Love", desc:"4 eggs on bread, baked beans, leafy greens.", price:14.50, group:"food",
+        options:[{label:"Gluten-free bread (not toasted)", price:1.90}],
+        extras:[{label:"Made in Ghee", price:1.50}],
+        addons:[{label:"Smoked Salmon", price:2.90},{label:"Chicken Salami", price:2.00},{label:"Mild-nutty cheese", price:1.50}] },
+      { name:"Eggo-Cardo", desc:"4 eggs + 2 scoops avocado cream, mushrooms.", price:15.50, group:"food",
+        options:[{label:"Gluten-free bread (not toasted)", price:1.90}],
+        extras:[{label:"Made in Ghee", price:1.50}],
+        addons:[{label:"Smoked Salmon", price:2.90},{label:"Chicken Salami", price:2.00},{label:"Mild-nutty cheese", price:1.50}] },
+    ]
+  },
+  {
+    id:"green",
+    name:"Green Brunch",
+    items:[
+      { name:"Avocado Garden", desc:"Wholegrain bread, avocado cream, mushrooms.", price:9.90, group:"food", tag:"vegan",
+        options:[{label:"Gluten-free bread (not toasted)", price:1.90}],
+        extras:[{label:"2 Organic scrambled eggs", price:3.50}] },
+      { name:"Avocado Heaven", desc:"Croissant, avocado cream, mushrooms.", price:10.50, group:"food",
+        options:[{label:"Gluten-free bread (not toasted)", price:1.90}],
+        extras:[{label:"2 Organic scrambled eggs", price:3.50}] },
+      { name:"Keto Fuel Scramble", desc:"4 eggs, mushrooms, leafy greens.", price:11.90, group:"food", tag:"keto",
+        extras:[{label:"Made in Ghee", price:1.50}],
+        addons:[{label:"Smoked Salmon", price:2.90},{label:"Chicken Salami", price:2.00},{label:"Mild-nutty cheese", price:1.50}] },
+      { name:"Modest Keto", desc:"4 eggs + 1 scoop avocado cream, mushrooms.", price:13.50, group:"food", tag:"keto",
+        extras:[{label:"Made in Ghee", price:1.50}],
+        addons:[{label:"Smoked Salmon", price:2.90},{label:"Chicken Salami", price:2.00},{label:"Mild-nutty cheese", price:1.50}] },
+      { name:"Keto is King", desc:"5 eggs + 2 scoops avocado cream, mushrooms.", price:16.50, group:"food", tag:"keto",
+        extras:[{label:"Made in Ghee", price:1.50}],
+        addons:[{label:"Smoked Salmon", price:2.90},{label:"Chicken Salami", price:2.00},{label:"Mild-nutty cheese", price:1.50}] },
+    ]
+  },
+  {
+    id:"special",
+    name:"Brunch O'Clock Special",
+    items:[
+      { name:"The Conqueror", desc:"Elite-style keto: 5 eggs in ghee, truffle mayo, salmon, mozzarella.", price:23.50, group:"food", tag:"signature" },
+    ]
+  },
+  {
+    id:"specialmenu",
+    name:"Special Menu",
+    note:"Only available per person.",
+    items:[
+      { name:'"She said \'She is not hungry\'"', desc:"Eggo-Cardo or Granny's Love + smoked salmon + smoothie + 0.2l juice + warm drink. Smoked salmon included.", price:27.50, group:"food", special:true,
+        choiceGroups:[
+          {title:"Base dish (choose one)", key:"base", choices:[{label:"Eggo-Cardo (3 eggs)", price:0},{label:"Granny's Love (3 eggs)", price:0}]},
+          {title:"Smoothie of her choice", key:"smoothie", choices:SMOOTHIE_CHOICES},
+          {title:"Juice, 0.2l", key:"juice", choices:JUICE_CHOICES_02L},
+          {title:"Warm drink", key:"warm", choices:WARM_DRINK_CHOICES},
+        ]
+      },
+      { name:'"He never said \'He is not hungry\'"', desc:"Any Eggcellent/Keto Brunch dish + smoked salmon + smoothie + 0.4l juice + warm drink. Smoked salmon included.", price:32.50, group:"food", special:true,
+        choiceGroups:[
+          {title:"Base dish (any Eggcellent/Keto Brunch)", key:"base", choices:EGGCELLENT_KETO_CHOICES},
+          {title:"Smoothie of choice", key:"smoothie", choices:SMOOTHIE_CHOICES},
+          {title:"Juice, 0.4l", key:"juice", choices:JUICE_CHOICES_04L},
+          {title:"Warm drink of choice", key:"warm", choices:WARM_DRINK_CHOICES},
+        ]
+      },
+      { name:"Top Special (both together)", desc:'Order both "She Said" + "He Never Said" — dessert on the house.', price:33.50, group:"food", special:true },
+    ]
+  },
+  {
+    id:"salad",
+    name:"Simply Salad",
+    note:"Available Monday to Friday only.",
+    items:[
+      { name:"Mr. Photosynthesis", desc:"6 vegan balls, leafy greens, avocado, fruit.", price:12.90, group:"food", tag:"vegan" },
+      { name:"Mrs. Peck", desc:"6 chicken balls, leafy greens, avocado, fruit.", price:13.90, group:"food" },
+    ]
+  },
+];
+
+const FILTERS = [
+  {id:"all", label:"All"},
+  {id:"food", label:"Food"},
+  {id:"pancake", label:"Pancake"},
+  {id:"bowl", label:"Bowl"},
+];
+
+/* ---------------------------------------------------------------
+   DRINKS MENU — its own swipeable page, not just a filter, since
+   otherwise the food menu would need a lot of scrolling to reach it.
+   group: "smoothie" | "cooldrink" | "warmdrink" -> drinks page filters
+--------------------------------------------------------------- */
+// Shared "how do you want it" choices for coffee-, chai-, and
+// matcha-based drinks — kept deliberately narrow to just milk type
+// and serving temperature, per how this venue actually customizes them.
+const MILK_SERVE_CHOICES = [
+  {title:"Milk", key:"milk", choices:[{label:"Cow milk", price:0},{label:"Oat milk", price:0}]},
+  {title:"Served", key:"serve", choices:[{label:"Hot", price:0},{label:"Cold", price:0}]},
+];
+
+const DRINKS_MENU = [
+  {
+    id:"smoothies",
+    name:"Natural Smoothies",
+    note:"All smoothie ingredients are sourced by certified organic companies.",
+    items:[
+      { name:"Green Emerald", desc:"Baby spinach, kale, banana, dates, lemon juice.", price:6.90, group:"smoothie", tag:"vegan" },
+      { name:"Tango With Mango", desc:"Mango, banana, orange, dates, ginger, turmeric, lime juice.", price:6.90, group:"smoothie", tag:"vegan" },
+      { name:"Harmony", desc:"Mixed berries, açaí, pomegranate, banana, dates.", price:6.90, group:"smoothie", tag:"vegan" },
+      { name:"Earth", desc:"Banana, dates, mixed berries, cinnamon, super greens.", price:8.90, group:"smoothie", tag:"vegan" },
+      { name:"Blue Moon", desc:"Blue spirulina, banana, pineapple, mango.", price:7.90, group:"smoothie", tag:"vegan" },
+      { name:"Matcha Cha", desc:"Banana, mango, dates, coconut, avocado, matcha, lime juice.", price:7.90, group:"smoothie", tag:"vegan" },
+      { name:"Superpea", desc:"30g quality pea protein, zero-sugar peanut butter, banana, dates.", price:8.90, group:"smoothie", tag:"vegan" },
+      { name:"Superwhey", desc:"30g quality whey protein, zero-sugar peanut butter, banana, dates.", price:8.90, group:"smoothie" },
+    ]
+  },
+  {
+    id:"cooldrinks",
+    name:"Cool Drinks",
+    items:[
+      { name:"Bionade 0.33l", desc:"Lemon, orange, elderberry.", price:3.80, group:"cooldrink" },
+      { name:"Vitamalz 0.33l", desc:"Alcohol-free.", price:3.80, group:"cooldrink" },
+      { name:"Apple Juice 0.4l", desc:"", price:4.00, group:"cooldrink" },
+      { name:"Orange Juice 0.4l", desc:"", price:4.00, group:"cooldrink" },
+    ]
+  },
+  {
+    id:"water",
+    name:"Water",
+    items:[
+      { name:"Acqua Panna 0.2l", desc:"Still mineral water, from Tuscany.", price:3.50, group:"water" },
+      { name:"San Pellegrino 0.2l", desc:"Sparkling mineral water.", price:3.50, group:"water" },
+      { name:"San Pellegrino 0.7l", desc:"Sparkling mineral water.", price:3.50, group:"water" },
+      { name:"Acqua Panna 1l", desc:"Still mineral water, from Tuscany.", price:6.90, group:"water" },
+    ]
+  },
+  {
+    id:"coffees",
+    name:"Warm Drinks",
+    note:"All our coffees and matcha ingredients are sourced by certified organic companies.",
+    items:[
+      { name:"Matcha Latte", desc:"", price:5.00, group:"warmdrink", tag:"vegan", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Dirty Matcha", desc:"Matcha Latte with an espresso shot.", price:6.20, group:"warmdrink", tag:"vegan", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Hot Chocolate", desc:"", price:5.00, group:"warmdrink" },
+      { name:"Espresso Single", desc:"", price:3.10, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Espresso Double", desc:"", price:3.10, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Arabic Style Espresso Double", desc:"With cardamom.", price:4.10, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Mild Coffee", desc:"", price:3.80, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Americano", desc:"", price:4.00, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Caffè Crema", desc:"", price:3.90, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Cappuccino", desc:"", price:4.40, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Latte Macchiato", desc:"", price:5.00, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Flat White", desc:"", price:5.50, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Casanova", desc:"Triple espresso shot with milk foam.", price:6.00, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Tea", desc:"Different varieties — ask us!", price:3.80, group:"warmdrink" },
+    ]
+  },
+  {
+    id:"specialwarmdrinks",
+    name:"Super Special Warm Drinks",
+    items:[
+      { name:"Chai Of My Life", desc:"Authentic homemade Masala Chai, special spice blend.", price:5.20, group:"specialwarm", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Warm Me Up Chai", desc:"Authentic homemade Masala Chai, warming spice blend.", price:5.50, group:"specialwarm", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Golden Glow Latte", desc:"Turmeric, maple syrup, rose petals.", price:5.20, group:"specialwarm",
+        options:[{label:"Vegan (oat milk)", price:0}] },
+      { name:"Pink Sky Latte", desc:"Beetroot powder, sugar, cardamom, cinnamon, ginger, acerola juice powder.", price:5.20, group:"specialwarm",
+        options:[{label:"Vegan (oat milk)", price:0}] },
+      { name:"Too Dirty To Be Chai", desc:"Chai latte with an espresso shot.", price:6.20, group:"specialwarm", choiceGroups:MILK_SERVE_CHOICES },
+    ]
+  },
+];
+
+const DRINK_FILTERS = [
+  {id:"all", label:"All"},
+  {id:"smoothie", label:"Smoothies"},
+  {id:"cooldrink", label:"Cool Drinks"},
+  {id:"water", label:"Water"},
+  {id:"warmdrink", label:"Warm Drinks"},
+  {id:"specialwarm", label:"Super Special"},
+];
+
+/* ---------------------------------------------------------------
+   STATE
+   Every table keeps its own order array, keyed by table id, so
+   switching tables never loses what's already been added elsewhere.
+   `order` is always kept as a live alias to orders[currentTable] —
+   lines are mutated in place (push/splice/length=0) rather than
+   reassigned, so the alias never goes stale.
+--------------------------------------------------------------- */
+let orders = {};        // tableId -> array of order lines
+let tableMeta = {};      // tableId -> {guests: ""}
+let currentTable = null;
+let order = [];          // alias of orders[currentTable]
+let activeFilter = "all";
+let activeSearch = "";
+let pendingItem = null;
+let pendingQty = 1;
+let pendingUnits = []; // one entry per unit: {selections:[{key,label,price}], note:""}
+
+/* A line's "key" identifies its exact configuration (name + mods + note).
+   Two additions with the same key merge into one line with a combined qty,
+   instead of piling up duplicate rows — e.g. two separate "gluten free"
+   Pancake Bouquets become one line reading ×2, while a "granola free" one
+   stays its own line. */
+function lineKey(name, mods, note){
+  const modsPart = mods.map(m=>m.label).sort().join(",");
+  return `${name}::${modsPart}::${note.trim()}`;
+}
+
+/* ---------------------------------------------------------------
+   TABLE SELECTION
+--------------------------------------------------------------- */
+const TABLE_COUNT = 16; // adjust to match how many numbered tables the venue has
+const tableSelectScreen = document.getElementById("tableSelectScreen");
+const orderScreen = document.getElementById("orderScreen");
+const tableGrid = document.getElementById("tableGrid");
+const tssPrompt = document.getElementById("tssPrompt");
+
+// When true, the next table tapped on the grid RECEIVES the current
+// table's order (a full move) instead of opening its own order — used
+// when a guest physically moves tables mid-order.
+let moveMode = false;
+let moveModeSourceTable = null;
+
+function orderTotalFor(tableId){
+  const lines = orders[tableId] || [];
+  return lines.reduce((s,l)=>s+l.qty,0);
+}
+
+function renderTableGrid(){
+  let html = "";
+  for(let i=1; i<=TABLE_COUNT; i++){
+    const count = orderTotalFor(i);
+    const isSource = moveMode && String(i)===String(moveModeSourceTable);
+    html += `
+      <button class="table-btn ${count>0?"has-order":""}" data-table="${i}" ${isSource?"disabled":""}>
+        ${count>0 ? `<span class="tb-count">${count}</span>` : ""}
+        ${i}
+        <span class="tb-sub">${isSource ? "current" : (count>0 ? count+" items" : "table")}</span>
+      </button>
+    `;
+  }
+  tableGrid.innerHTML = html;
+  tableGrid.querySelectorAll(".table-btn:not(:disabled)").forEach(btn=>{
+    btn.addEventListener("click", ()=> selectTable(btn.dataset.table));
+  });
+
+  if(tssPrompt){
+    tssPrompt.innerHTML = moveMode
+      ? `Moving Table ${moveModeSourceTable}'s order — pick the new table <button class="unit-copy-link" id="cancelMoveBtn" style="margin-left:8px;">Cancel</button>`
+      : "Select a table to start the order";
+    const cancelBtn = document.getElementById("cancelMoveBtn");
+    if(cancelBtn) cancelBtn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      moveMode = false;
+      selectTable(moveModeSourceTable);
+    });
+  }
+}
+
+function selectTable(id){
+  id = String(id).trim();
+  if(!id) return;
+
+  if(moveMode){
+    const source = moveModeSourceTable;
+    if(id === source){ moveMode = false; }
+    else {
+      if(orders[id] && orders[id].length > 0){
+        const ok = confirm(`Table ${id} already has an order in progress. Merge Table ${source}'s order into it?`);
+        if(!ok) return;
+        orders[id] = orders[id].concat(orders[source]);
+      } else {
+        orders[id] = orders[source];
+      }
+      tableMeta[id] = tableMeta[source] || {guests:""};
+      delete orders[source];
+      delete tableMeta[source];
+      moveMode = false;
+      showToast(`Order moved from Table ${source} to Table ${id}`);
+    }
+  }
+
+  currentTable = id;
+  if(!orders[id]) orders[id] = [];
+  order = orders[id];
+  if(!tableMeta[id]) tableMeta[id] = {guests:""};
+
+  document.getElementById("activeTableLabel").textContent = id;
+  document.getElementById("guestCount").value = tableMeta[id].guests;
+
+  tableSelectScreen.style.display = "none";
+  orderScreen.style.display = "block";
+
+  renderMenu();
+  renderDrinksMenu();
+  renderTicket();
+  window.scrollTo(0,0);
+}
+
+function goToTableSelect(){
+  currentTable = null;
+  orderScreen.style.display = "none";
+  tableSelectScreen.style.display = "flex";
+  renderTableGrid();
+}
+
+document.getElementById("switchTableBtn").addEventListener("click", ()=>{
+  moveMode = false;
+  goToTableSelect();
+});
+document.getElementById("moveTableBtn").addEventListener("click", ()=>{
+  if(!currentTable) return;
+  moveMode = true;
+  moveModeSourceTable = currentTable;
+  orderScreen.style.display = "none";
+  tableSelectScreen.style.display = "flex";
+  renderTableGrid();
+});
+document.getElementById("customTableBtn").addEventListener("click", ()=>{
+  const val = document.getElementById("customTableInput").value.trim();
+  if(val) selectTable(val);
+});
+document.getElementById("customTableInput").addEventListener("keydown", (e)=>{
+  if(e.key === "Enter") document.getElementById("customTableBtn").click();
+});
+
+const fmt = n => n.toFixed(2).replace(".", ",") + "€";
+
+// Escapes a string for safe use inside an HTML attribute (e.g. data-name="...").
+// Needed because a couple of dish names contain literal quote characters
+// (the Special Menu items), which would otherwise break the attribute.
+function escapeAttr(str){
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/* ---------------------------------------------------------------
+   FILTER BAR
+--------------------------------------------------------------- */
+const filterBar = document.getElementById("filterBar");
+function renderFilterBar(){
+  filterBar.innerHTML = FILTERS.map(f=>
+    `<button class="filter-pill ${f.id===activeFilter?"active":""}" data-filter="${f.id}">${f.label}</button>`
+  ).join("");
+  filterBar.querySelectorAll(".filter-pill").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      activeFilter = btn.dataset.filter;
+      renderFilterBar();
+      renderMenu();
+    });
+  });
+}
+
+/* ---------------------------------------------------------------
+   RENDER MENU
+--------------------------------------------------------------- */
+const menuContainer = document.getElementById("menuContainer");
+
+function itemMatchesFilter(item){
+  if(activeFilter === "all") return true;
+  return item.group === activeFilter;
+}
+function itemMatchesSearch(item){
+  const f = activeSearch.trim().toLowerCase();
+  if(!f) return true;
+  return item.name.toLowerCase().includes(f) || item.desc.toLowerCase().includes(f);
+}
+
+function renderMenu(){
+  // Flat, header-less grid for the pancake / bowl filters
+  if(activeFilter === "pancake" || activeFilter === "bowl"){
+    const flat = [];
+    MENU.forEach(cat=> cat.items.forEach(it=>{ if(itemMatchesFilter(it) && itemMatchesSearch(it)) flat.push(it); }));
+
+    if(flat.length === 0){
+      const label = FILTERS.find(f=>f.id===activeFilter).label;
+      menuContainer.innerHTML = `
+        <div class="empty-state">
+          <span class="big">🍽️</span>
+          No ${label.toLowerCase()} items ${activeSearch ? "match your search" : "on the menu yet"}.
+        </div>`;
+    } else {
+      menuContainer.innerHTML = `<div class="item-grid">${flat.map(itemCardHTML).join("")}</div>`;
+    }
+    attachCardHandlers(menuContainer);
+    return;
+  }
+
+  // Grouped view for "All" and "Food"
+  let html = "";
+  MENU.forEach(cat=>{
+    const items = cat.items.filter(it=>{
+      if(activeFilter === "food" && it.group !== "food") return false;
+      return itemMatchesSearch(it);
+    });
+    if(items.length === 0) return;
+    html += `
+      <section class="category-block">
+        <div class="category-head"><h2>${cat.name}</h2></div>
+        ${cat.note ? `<div class="category-note">${cat.note}</div>` : ""}
+        <div class="item-grid">${items.map(itemCardHTML).join("")}</div>
+      </section>
+    `;
+  });
+  menuContainer.innerHTML = html || `<div class="empty-state"><span class="big">🔍</span>No dishes match your search.</div>`;
+  attachCardHandlers(menuContainer);
+}
+
+/* ---------------------------------------------------------------
+   RENDER DRINKS PAGE — mirrors the food page's filter/render logic,
+   kept as its own small set of functions/state rather than forcing
+   a shared abstraction, since the two pages diverge slightly (icons,
+   empty-state copy) and this keeps each easy to read on its own.
+--------------------------------------------------------------- */
+const drinksFilterBarEl = document.getElementById("drinksFilterBar");
+const drinksContainer = document.getElementById("drinksContainer");
+let activeDrinksFilter = "all";
+let activeDrinksSearch = "";
+
+function renderDrinksFilterBar(){
+  drinksFilterBarEl.innerHTML = DRINK_FILTERS.map(f=>
+    `<button class="filter-pill ${f.id===activeDrinksFilter?"active":""}" data-filter="${f.id}">${f.label}</button>`
+  ).join("");
+  drinksFilterBarEl.querySelectorAll(".filter-pill").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      activeDrinksFilter = btn.dataset.filter;
+      renderDrinksFilterBar();
+      renderDrinksMenu();
+    });
+  });
+}
+
+function drinksItemMatchesFilter(item){
+  if(activeDrinksFilter === "all") return true;
+  return item.group === activeDrinksFilter;
+}
+function drinksItemMatchesSearch(item){
+  const f = activeDrinksSearch.trim().toLowerCase();
+  if(!f) return true;
+  return item.name.toLowerCase().includes(f) || (item.desc||"").toLowerCase().includes(f);
+}
+
+function renderDrinksMenu(){
+  let html = "";
+  DRINKS_MENU.forEach(cat=>{
+    const items = cat.items.filter(it=> drinksItemMatchesFilter(it) && drinksItemMatchesSearch(it));
+    if(items.length === 0) return;
+    html += `
+      <section class="category-block">
+        <div class="category-head"><h2>${cat.name}</h2></div>
+        ${cat.note ? `<div class="category-note">${cat.note}</div>` : ""}
+        <div class="item-grid">${items.map(itemCardHTML).join("")}</div>
+      </section>
+    `;
+  });
+  if(!html){
+    const label = activeDrinksFilter === "all" ? "drinks" : DRINK_FILTERS.find(f=>f.id===activeDrinksFilter).label.toLowerCase();
+    html = `
+      <div class="empty-state">
+        <span class="big">🥤</span>
+        No ${label} ${activeDrinksSearch ? "match your search" : "on the menu yet"}.
+      </div>`;
+  }
+  drinksContainer.innerHTML = html;
+  attachCardHandlers(drinksContainer);
+}
+
+function itemCardHTML(it){
+  const tag = (it.tag && it.tag !== "vegan") ? `<span class="tag">${it.tag}</span>` : "";
+  const qty = defaultQtyFor(it.name);
+  const totalQty = totalQtyForItem(it.name);
+  return `
+    <div class="item-card ${totalQty>0 ? "in-order":""}" data-item="${escapeAttr(it.name)}">
+      <div class="item-top">
+        <div class="item-name">${it.name}</div>
+      </div>
+      ${tag}
+      <div class="card-bottom">
+        <button class="customize-icon-btn" data-name="${escapeAttr(it.name)}" aria-label="Customize / allergies" title="Customize / allergies">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2" fill="currentColor" stroke="none"/>
+            <line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2" fill="currentColor" stroke="none"/>
+            <line x1="4" y1="18" x2="20" y2="18"/><circle cx="11" cy="18" r="2" fill="currentColor" stroke="none"/>
+          </svg>
+        </button>
+        <div class="qty-stepper" data-name="${escapeAttr(it.name)}">
+          <button class="step-btn minus" ${qty===0?"disabled":""}>−</button>
+          <span class="step-val">${qty}</span>
+          <button class="step-btn plus">+</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Looks an item up by name across BOTH the food menu and the drinks
+// menu, since a single ticket/table order can hold items from either.
+function findItemByName(name){
+  for(const cat of MENU){
+    const it = cat.items.find(i=>i.name===name);
+    if(it) return it;
+  }
+  for(const cat of DRINKS_MENU){
+    const it = cat.items.find(i=>i.name===name);
+    if(it) return it;
+  }
+  return null;
+}
+
+/* ---------------------------------------------------------------
+   KITCHEN BROADCAST — splits a sent order across the 3 kitchen
+   stations and pushes each station's slice to Firebase, so each
+   station's phone (kitchen-display.html) only ever sees its own
+   items. This section is entirely additive: if FIREBASE_CONFIG below
+   is left as the placeholder, "Send order to kitchen" behaves exactly
+   as it always has (clears the ticket, no broadcast, no errors).
+
+   To activate: create a free Firebase project at
+   https://console.firebase.google.com → Build → Realtime Database,
+   then Project settings → your web app → copy the config values in
+   below. Use the SAME config in kitchen-display.html.
+--------------------------------------------------------------- */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCgVv9ANGiB3m0UNzFmx-UHRxsOkUjl9C8",
+  authDomain: "swap-s-ordering-system.firebaseapp.com",
+  databaseURL: "https://swap-s-ordering-system-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "swap-s-ordering-system",
+};
+
+let kitchenDb = null;
+if(FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY"){
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    kitchenDb = firebase.database();
+  } catch(e){
+    console.error("Firebase init failed — kitchen broadcast disabled:", e);
+  }
+}
+
+// Station routing — matches how the 3 kitchen phones are staffed:
+//  · pancakeBowlSmoothie: pancakes, smoothie bowls, natural smoothies
+//  · hotFoodEggsSalad: every egg dish + the salads (the "food" group)
+//  · drinks: water, everyday coffees, and the Super Special warm drinks
+function stationForItemName(name){
+  const it = findItemByName(name);
+  if(!it) return null;
+  if(it.group === "pancake" || it.group === "bowl" || it.group === "smoothie") return "pancakeBowlSmoothie";
+  if(it.group === "food") return "hotFoodEggsSalad";
+  if(["cooldrink","water","warmdrink","specialwarm"].includes(it.group)) return "drinks";
+  return null;
+}
+
+function broadcastOrderToKitchen(tableId, guests, lines){
+  if(!kitchenDb) return;
+  const buckets = {pancakeBowlSmoothie:[], hotFoodEggsSalad:[], drinks:[]};
+  lines.forEach(line=>{
+    const station = stationForItemName(line.name);
+    if(!station) return;
+    buckets[station].push({
+      name: line.name,
+      qty: line.qty,
+      mods: line.mods.map(m=>m.label),
+      note: line.note || ""
+    });
+  });
+  Object.keys(buckets).forEach(station=>{
+    if(buckets[station].length === 0) return;
+    kitchenDb.ref("stationOrders/"+station).push({
+      table: tableId,
+      guests: guests || "",
+      createdAt: Date.now(),
+      status: "pending",
+      items: buckets[station]
+    });
+  });
+}
+
+function attachCardHandlers(container){
+  container.querySelectorAll(".customize-icon-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const item = findItemByName(btn.dataset.name);
+      openItemModal(item);
+    });
+  });
+  container.querySelectorAll(".qty-stepper").forEach(stepper=>{
+    const name = stepper.dataset.name;
+    stepper.querySelector(".plus").addEventListener("click", ()=> bumpPlainLine(name, 1));
+    stepper.querySelector(".minus").addEventListener("click", ()=> bumpPlainLine(name, -1));
+  });
+}
+
+/* ---------------------------------------------------------------
+   LINE MERGING — any add (plain card stepper or a customized modal
+   add) goes through here, so two identical configurations combine
+   into one line with qty > 1, while different configurations of the
+   same dish stay as separate lines.
+--------------------------------------------------------------- */
+function addOrUpdateLine(item, mods, note, qtyDelta){
+  const key = lineKey(item.name, mods, note);
+  let line = order.find(l=>l.key===key);
+  if(!line){
+    if(qtyDelta <= 0) return;
+    const unitPrice = item.price + mods.reduce((s,m)=>s+m.price,0);
+    line = { uid: Date.now()+"-"+Math.random().toString(36).slice(2,7), name:item.name, basePrice:item.price, mods, unitPrice, qty:0, note, key };
+    order.push(line);
+  }
+  line.qty += qtyDelta;
+  if(line.qty <= 0){
+    const idx = order.indexOf(line);
+    if(idx > -1) order.splice(idx, 1);
+  }
+}
+
+/* The card's own +/- stepper always targets the plain (no modifier,
+   no note) configuration of that dish. */
+function defaultQtyFor(name){
+  const line = order.find(l=>l.name===name && l.mods.length===0 && !l.note);
+  return line ? line.qty : 0;
+}
+
+function bumpPlainLine(name, delta){
+  const item = findItemByName(name);
+  addOrUpdateLine(item, [], "", delta);
+  renderTicket();
+  refreshCardSteppers();
+}
+
+/* Total quantity of a dish across ALL its configurations combined —
+   e.g. 1 gluten-free + 1 granola-free + 2 plain Pancake Bouquets = 4. */
+function totalQtyForItem(name){
+  return order.filter(l=>l.name===name).reduce((s,l)=>s+l.qty,0);
+}
+
+/* Re-render both pages' grids from current state, so every card's
+   stepper value and "in-order" tint always reflects the order exactly
+   — simpler and less error-prone than patching individual DOM nodes.
+   Both pages stay mounted in the DOM (for the swipe animation), so
+   both need refreshing regardless of which one is currently visible. */
+function refreshCardSteppers(){
+  renderMenu();
+  renderDrinksMenu();
+}
+
+/* ---------------------------------------------------------------
+   MODIFIER MODAL (customization, incl. allergy flags)
+--------------------------------------------------------------- */
+const overlay = document.getElementById("overlay");
+const modalBody = document.getElementById("modalBody");
+
+function openItemModal(item){
+  pendingItem = item;
+  pendingQty = 1;
+  pendingUnits = [{selections:[], note:""}];
+  renderModal();
+  overlay.classList.add("open");
+}
+function closeModal(){
+  overlay.classList.remove("open");
+  pendingItem = null;
+}
+function unitPrice(unit){
+  return pendingItem.price + unit.selections.reduce((s,m)=>s+m.price,0);
+}
+function totalAllUnits(){
+  return pendingUnits.reduce((s,u)=>s+unitPrice(u),0);
+}
+
+function setQty(newQty){
+  newQty = Math.max(1, newQty);
+  if(newQty > pendingQty){
+    for(let i=pendingQty; i<newQty; i++) pendingUnits.push({selections:[], note:""});
+  } else if(newQty < pendingQty){
+    pendingUnits = pendingUnits.slice(0, newQty);
+  }
+  pendingQty = newQty;
+  renderModal();
+}
+
+function renderModal(){
+  const it = pendingItem;
+
+  const optionGroupHTML = (unitIdx, title, list, keyPrefix, extraClass="", single=false) => {
+    if(!list || list.length===0) return "";
+    const unit = pendingUnits[unitIdx];
+    const requiredTag = single ? `<span class="group-required">choose one</span>` : "";
+    return `
+      <div class="group-title">${title}${requiredTag}</div>
+      ${list.map((opt, i)=>{
+        const key = keyPrefix+i;
+        const checked = unit.selections.some(s=>s.key===key);
+        return `
+          <label class="opt-row ${extraClass} ${checked?"checked":""}" data-unit="${unitIdx}" data-key="${key}" data-group="${keyPrefix}" data-single="${single}" data-label="${opt.label}" data-price="${opt.price}">
+            <span><input type="${single?"radio":"checkbox"}" ${checked?"checked":""}/> ${opt.label}</span>
+            <span class="opt-price">${opt.price>0 ? "+"+fmt(opt.price) : ""}</span>
+          </label>
+        `;
+      }).join("")}
+    `;
+  };
+
+  const unitsHTML = pendingUnits.map((unit, idx)=>{
+    const copyLink = idx>0 ? `<button class="unit-copy-link" data-copy-to="${idx}">Copy from Guest 1</button>` : "";
+    const choiceGroupsHTML = (it.choiceGroups || []).map(g =>
+      optionGroupHTML(idx, g.title, g.choices, "cg-"+g.key+"-", "choice", true)
+    ).join("");
+    return `
+      <div class="unit-block">
+        <div class="unit-head">
+          <span class="unit-title">Guest ${idx+1}</span>
+          <span class="unit-price-tag">${fmt(unitPrice(unit))}</span>
+        </div>
+        ${copyLink}
+        ${choiceGroupsHTML}
+        ${optionGroupHTML(idx, "Options", it.options, "opt-")}
+        ${optionGroupHTML(idx, "Extras", it.extras, "ext-")}
+        ${optionGroupHTML(idx, "Add ons", it.addons, "add-")}
+        ${optionGroupHTML(idx, "Allergy / dietary flags", ALLERGY_FLAGS, "alg-", "allergy")}
+        <div class="group-title">Kitchen note</div>
+        <textarea data-note-unit="${idx}" placeholder="e.g. dressing on the side...">${unit.note}</textarea>
+      </div>
+    `;
+  }).join("");
+
+  modalBody.innerHTML = `
+    <h3>${it.name}</h3>
+    ${it.desc ? `<div class="modal-desc">${it.desc}</div>` : ""}
+    <div class="modal-qty-row">
+      <span class="qty-label">How many ${it.name} for this table?</span>
+      <div class="qty-group">
+        <button class="qty-btn" id="modalQtyMinus" ${pendingQty<=1?"disabled":""}>−</button>
+        <span class="qty-val" id="modalQtyVal">${pendingQty}</span>
+        <button class="qty-btn" id="modalQtyPlus">+</button>
+      </div>
+    </div>
+    ${unitsHTML}
+    <div class="modal-footer">
+      <button class="modal-cancel" id="modalCancel">Cancel</button>
+      <button class="modal-confirm" id="modalConfirm">Add ${pendingQty>1?"all "+pendingQty+" — ":"— "}<span class="modal-price-live">${fmt(totalAllUnits())}</span></button>
+    </div>
+  `;
+
+  document.getElementById("modalQtyMinus").addEventListener("click", ()=> setQty(pendingQty-1));
+  document.getElementById("modalQtyPlus").addEventListener("click", ()=> setQty(pendingQty+1));
+
+  modalBody.querySelectorAll(".opt-row").forEach(row=>{
+    row.addEventListener("click", (e)=>{
+      e.preventDefault();
+      const unitIdx = parseInt(row.dataset.unit, 10);
+      const key = row.dataset.key;
+      const group = row.dataset.group;
+      const single = row.dataset.single === "true";
+      const unit = pendingUnits[unitIdx];
+      const existingIdx = unit.selections.findIndex(s=>s.key===key);
+      if(single){
+        if(existingIdx>-1){
+          unit.selections.splice(existingIdx,1); // tap again to clear the pick
+        } else {
+          unit.selections = unit.selections.filter(s=>!s.key.startsWith(group));
+          unit.selections.push({key, label: row.dataset.label, price: parseFloat(row.dataset.price)});
+        }
+      } else {
+        if(existingIdx>-1){
+          unit.selections.splice(existingIdx,1);
+        } else {
+          unit.selections.push({key, label: row.dataset.label, price: parseFloat(row.dataset.price)});
+        }
+      }
+      renderModal();
+    });
+  });
+
+  modalBody.querySelectorAll("[data-note-unit]").forEach(ta=>{
+    ta.addEventListener("input", (e)=>{
+      pendingUnits[parseInt(ta.dataset.noteUnit,10)].note = e.target.value;
+    });
+  });
+
+  modalBody.querySelectorAll("[data-copy-to]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const idx = parseInt(btn.dataset.copyTo, 10);
+      pendingUnits[idx] = {
+        selections: pendingUnits[0].selections.map(s=>({...s})),
+        note: pendingUnits[0].note
+      };
+      renderModal();
+    });
+  });
+
+  document.getElementById("modalCancel").addEventListener("click", closeModal);
+  document.getElementById("modalConfirm").addEventListener("click", confirmAddToOrder);
+}
+
+function confirmAddToOrder(){
+  const item = pendingItem;
+  const qty = pendingQty;
+  pendingUnits.forEach(unit=>{
+    addOrUpdateLine(item, unit.selections, unit.note.trim(), 1);
+  });
+  closeModal();
+  renderTicket();
+  refreshCardSteppers();
+  showToast(`${qty>1 ? qty+"× " : ""}${item.name} added to ticket`);
+}
+
+overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(); });
+
+/* ---------------------------------------------------------------
+   TICKET / ORDER PANEL
+--------------------------------------------------------------- */
+const ticketItems = document.getElementById("ticketItems");
+const totalItemsEl = document.getElementById("totalItems");
+const totalPriceEl = document.getElementById("totalPrice");
+const sendBtn = document.getElementById("sendBtn");
+const ticketMeta = document.getElementById("ticketMeta");
+const cartToggleCount = document.getElementById("cartToggleCount");
+
+function renderTicket(){
+  if(order.length === 0){
+    ticketItems.innerHTML = `<div class="ticket-empty">Tap a dish to add it here.<br>Build the order, then send it to the kitchen.</div>`;
+  } else {
+    ticketItems.innerHTML = order.map(line=>{
+      const modsText = line.mods.length
+        ? line.mods.map(m=> m.price>0 ? `${m.label} (+${fmt(m.price)})` : m.label).join(" · ")
+        : "";
+      return `
+        <div class="ticket-line" data-uid="${line.uid}">
+          <div class="tl-top">
+            <div class="tl-name">${line.name}</div>
+            <div class="tl-price">${fmt(line.unitPrice*line.qty)}</div>
+          </div>
+          ${modsText ? `<div class="tl-mods">${modsText}</div>` : ""}
+          ${line.note ? `<div class="tl-mods">📝 ${line.note}</div>` : ""}
+          <div class="tl-controls">
+            <div class="qty-group">
+              <button class="qty-btn" data-action="dec">–</button>
+              <span class="qty-val">${line.qty}</span>
+              <button class="qty-btn" data-action="inc">+</button>
+            </div>
+            <button class="remove-btn" data-action="remove">Remove</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  ticketItems.querySelectorAll(".ticket-line").forEach(el=>{
+    const uid = el.dataset.uid;
+    el.querySelector('[data-action="inc"]').addEventListener("click", ()=> changeQty(uid, 1));
+    el.querySelector('[data-action="dec"]').addEventListener("click", ()=> changeQty(uid, -1));
+    el.querySelector('[data-action="remove"]').addEventListener("click", ()=> removeLine(uid));
+  });
+
+  const totalItemsCount = order.reduce((s,l)=>s+l.qty,0);
+  const totalPrice = order.reduce((s,l)=>s+l.unitPrice*l.qty,0);
+  totalItemsEl.textContent = totalItemsCount;
+  totalPriceEl.textContent = fmt(totalPrice);
+  cartToggleCount.textContent = totalItemsCount;
+  sendBtn.disabled = order.length === 0;
+
+  const guests = document.getElementById("guestCount").value.trim();
+  ticketMeta.textContent = currentTable
+    ? `Table ${currentTable}${guests ? " · " + guests + " guests" : ""}`
+    : "No table selected";
+}
+
+function changeQty(uid, delta){
+  const line = order.find(l=>l.uid===uid);
+  if(!line) return;
+  line.qty += delta;
+  if(line.qty <= 0){
+    const idx = order.indexOf(line);
+    if(idx > -1) order.splice(idx, 1);
+  }
+  renderTicket();
+  refreshCardSteppers();
+}
+
+function removeLine(uid){
+  const idx = order.findIndex(l=>l.uid===uid);
+  if(idx > -1) order.splice(idx, 1);
+  renderTicket();
+  refreshCardSteppers();
+}
+
+document.getElementById("clearBtn").addEventListener("click", ()=>{
+  if(order.length===0) return;
+  if(confirm("Clear the entire order for this table?")){
+    order.length = 0;
+    renderTicket();
+    refreshCardSteppers();
+  }
+});
+
+sendBtn.addEventListener("click", ()=>{
+  if(!currentTable || order.length===0) return;
+  const totalPrice = order.reduce((s,l)=>s+l.unitPrice*l.qty,0);
+  const sentTable = currentTable;
+  const guests = (tableMeta[currentTable] && tableMeta[currentTable].guests) || "";
+  broadcastOrderToKitchen(sentTable, guests, order);
+  showToast(`Order sent for Table ${sentTable} — ${fmt(totalPrice)}`);
+  order.length = 0;
+  goToTableSelect();
+});
+
+document.getElementById("guestCount").addEventListener("input", (e)=>{
+  if(currentTable) tableMeta[currentTable].guests = e.target.value;
+  renderTicket();
+});
+
+/* ---------------------------------------------------------------
+   MOBILE CART TOGGLE
+--------------------------------------------------------------- */
+const ticketPanel = document.getElementById("ticketPanel");
+document.getElementById("cartToggle").addEventListener("click", ()=>{
+  ticketPanel.classList.toggle("open");
+});
+
+/* ---------------------------------------------------------------
+   SEARCH
+--------------------------------------------------------------- */
+document.getElementById("searchBox").addEventListener("input", (e)=>{
+  activeSearch = e.target.value;
+  renderMenu();
+});
+document.getElementById("drinksSearchBox").addEventListener("input", (e)=>{
+  activeDrinksSearch = e.target.value;
+  renderDrinksMenu();
+});
+
+/* ---------------------------------------------------------------
+   PAGE SWIPE — Food and Drinks live side by side on a sliding track.
+   Tapping a tab or swiping switches between them, so the drinks menu
+   doesn't force a long scroll past the whole food menu to reach.
+--------------------------------------------------------------- */
+let currentPage = "food"; // "food" | "drinks"
+const pagesTrack = document.getElementById("pagesTrack");
+const pagesViewport = document.getElementById("pagesViewport");
+
+function goToPage(page){
+  currentPage = page;
+  pagesTrack.style.transform = page === "drinks" ? "translateX(-50%)" : "translateX(0)";
+  document.querySelectorAll(".page-tab").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.page === page);
+  });
+}
+
+document.querySelectorAll(".page-tab").forEach(btn=>{
+  btn.addEventListener("click", ()=> goToPage(btn.dataset.page));
+});
+
+let swipeStartX = 0, swipeStartY = 0, swiping = false;
+pagesViewport.addEventListener("touchstart", (e)=>{
+  swipeStartX = e.touches[0].clientX;
+  swipeStartY = e.touches[0].clientY;
+  swiping = true;
+}, {passive:true});
+pagesViewport.addEventListener("touchend", (e)=>{
+  if(!swiping) return;
+  swiping = false;
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  const dy = e.changedTouches[0].clientY - swipeStartY;
+  if(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5){
+    if(dx > 0 && currentPage === "food") goToPage("drinks");   // swipe right -> Drinks
+    else if(dx < 0 && currentPage === "drinks") goToPage("food"); // swipe left -> back to Food
+  }
+}, {passive:true});
+
+/* ---------------------------------------------------------------
+   TOAST
+--------------------------------------------------------------- */
+let toastTimer;
+function showToast(msg){
+  const toast = document.getElementById("toast");
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> toast.classList.remove("show"), 2400);
+}
+
+/* ---------------------------------------------------------------
+   INIT — start on the table-select screen; the order pad itself
+   only becomes visible once a table has been chosen.
+--------------------------------------------------------------- */
+renderFilterBar();
+renderDrinksFilterBar();
+renderDrinksMenu();
+renderTableGrid();
+</script>
+</body>
+</html>
