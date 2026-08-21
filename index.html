@@ -6,6 +6,11 @@
 <title>Grünewald Brunch — Order Pad</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<!-- Firebase (used only to broadcast sent orders to the kitchen station
+     phones — see kitchen-display.html). Everything else in this file
+     works exactly as before even if this is left unconfigured. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
   :root{
     --cream:#FBF6EC;
@@ -85,10 +90,55 @@
     min-height:100vh;
   }
 
+  /* ---------- Food / Drinks swipeable pages ---------- */
+  .pages-viewport{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+  }
+  .page-tabs{
+    position:sticky;
+    top:0;
+    z-index:36;
+    display:flex;
+    background:var(--paper);
+    border-bottom:1px solid var(--line);
+  }
+  .page-tab{
+    flex:1;
+    border:none;
+    background:none;
+    padding:12px 10px;
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:14.5px;
+    color:var(--ink-soft);
+    cursor:pointer;
+    border-bottom:3px solid transparent;
+    transition:color .15s, border-color .15s;
+  }
+  .page-tab.active{
+    color:var(--forest-dark);
+    border-bottom-color:var(--coral);
+  }
+  .pages-clip{
+    overflow:hidden;
+  }
+  .pages-track{
+    display:flex;
+    width:200%;
+    transition:transform .28s ease;
+  }
+  .page-panel{
+    width:50%;
+    flex-shrink:0;
+    min-width:0;
+  }
+
   /* ---------- Filter pills ---------- */
   .filter-bar{
     position:sticky;
-    top:0;
+    top:44px;
     z-index:30;
     background:var(--cream);
     padding:16px 26px 10px;
@@ -736,7 +786,8 @@
   .cart-toggle{ display:none; }
   @media (max-width: 980px){
     .app{ grid-template-columns:1fr; }
-    .filter-bar{ padding:12px 14px 8px; top:0; }
+    .filter-bar{ padding:12px 14px 8px; top:44px; }
+    .page-tab{ font-size:13px; padding:11px 8px; }
     aside.ticket{
       position:fixed;
       bottom:0; left:0; right:0;
@@ -820,14 +871,33 @@
 </header>
 
 <div class="app">
-  <div>
-    <div class="filter-bar" id="filterBar"></div>
-    <main class="menu">
-      <div class="search-row">
-        <input type="text" id="searchBox" placeholder="Search dishes…">
+  <div class="pages-viewport" id="pagesViewport">
+    <div class="page-tabs">
+      <button class="page-tab active" data-page="food">🍽️ Food</button>
+      <button class="page-tab" data-page="drinks">🥤 Drinks</button>
+    </div>
+    <div class="pages-clip">
+      <div class="pages-track" id="pagesTrack">
+        <section class="page-panel">
+          <div class="filter-bar" id="filterBar"></div>
+          <main class="menu">
+            <div class="search-row">
+              <input type="text" id="searchBox" placeholder="Search dishes…">
+            </div>
+            <div id="menuContainer"></div>
+          </main>
+        </section>
+        <section class="page-panel">
+          <div class="filter-bar" id="drinksFilterBar"></div>
+          <main class="menu">
+            <div class="search-row">
+              <input type="text" id="drinksSearchBox" placeholder="Search drinks…">
+            </div>
+            <div id="drinksContainer"></div>
+          </main>
+        </section>
       </div>
-      <div id="menuContainer"></div>
-    </main>
+    </div>
   </div>
 
   <aside class="ticket" id="ticketPanel">
@@ -1023,7 +1093,100 @@ const FILTERS = [
   {id:"food", label:"Food"},
   {id:"pancake", label:"Pancake"},
   {id:"bowl", label:"Bowl"},
-  {id:"drink", label:"Drinks"},
+];
+
+/* ---------------------------------------------------------------
+   DRINKS MENU — its own swipeable page, not just a filter, since
+   otherwise the food menu would need a lot of scrolling to reach it.
+   group: "smoothie" | "cooldrink" | "warmdrink" -> drinks page filters
+--------------------------------------------------------------- */
+// Shared "how do you want it" choices for coffee-, chai-, and
+// matcha-based drinks — kept deliberately narrow to just milk type
+// and serving temperature, per how this venue actually customizes them.
+const MILK_SERVE_CHOICES = [
+  {title:"Milk", key:"milk", choices:[{label:"Cow milk", price:0},{label:"Oat milk", price:0}]},
+  {title:"Served", key:"serve", choices:[{label:"Hot", price:0},{label:"Cold", price:0}]},
+];
+
+const DRINKS_MENU = [
+  {
+    id:"smoothies",
+    name:"Natural Smoothies",
+    note:"All smoothie ingredients are sourced by certified organic companies.",
+    items:[
+      { name:"Green Emerald", desc:"Baby spinach, kale, banana, dates, lemon juice.", price:6.90, group:"smoothie", tag:"vegan" },
+      { name:"Tango With Mango", desc:"Mango, banana, orange, dates, ginger, turmeric, lime juice.", price:6.90, group:"smoothie", tag:"vegan" },
+      { name:"Harmony", desc:"Mixed berries, açaí, pomegranate, banana, dates.", price:6.90, group:"smoothie", tag:"vegan" },
+      { name:"Earth", desc:"Banana, dates, mixed berries, cinnamon, super greens.", price:8.90, group:"smoothie", tag:"vegan" },
+      { name:"Blue Moon", desc:"Blue spirulina, banana, pineapple, mango.", price:7.90, group:"smoothie", tag:"vegan" },
+      { name:"Matcha Cha", desc:"Banana, mango, dates, coconut, avocado, matcha, lime juice.", price:7.90, group:"smoothie", tag:"vegan" },
+      { name:"Superpea", desc:"30g quality pea protein, zero-sugar peanut butter, banana, dates.", price:8.90, group:"smoothie", tag:"vegan" },
+      { name:"Superwhey", desc:"30g quality whey protein, zero-sugar peanut butter, banana, dates.", price:8.90, group:"smoothie" },
+    ]
+  },
+  {
+    id:"cooldrinks",
+    name:"Cool Drinks",
+    items:[
+      { name:"Bionade 0.33l", desc:"Lemon, orange, elderberry.", price:3.80, group:"cooldrink" },
+      { name:"Vitamalz 0.33l", desc:"Alcohol-free.", price:3.80, group:"cooldrink" },
+      { name:"Apple Juice 0.4l", desc:"", price:4.00, group:"cooldrink" },
+      { name:"Orange Juice 0.4l", desc:"", price:4.00, group:"cooldrink" },
+    ]
+  },
+  {
+    id:"water",
+    name:"Water",
+    items:[
+      { name:"Acqua Panna 0.2l", desc:"Still mineral water, from Tuscany.", price:3.50, group:"water" },
+      { name:"San Pellegrino 0.2l", desc:"Sparkling mineral water.", price:3.50, group:"water" },
+      { name:"San Pellegrino 0.7l", desc:"Sparkling mineral water.", price:3.50, group:"water" },
+      { name:"Acqua Panna 1l", desc:"Still mineral water, from Tuscany.", price:6.90, group:"water" },
+    ]
+  },
+  {
+    id:"coffees",
+    name:"Warm Drinks",
+    note:"All our coffees and matcha ingredients are sourced by certified organic companies.",
+    items:[
+      { name:"Matcha Latte", desc:"", price:5.00, group:"warmdrink", tag:"vegan", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Dirty Matcha", desc:"Matcha Latte with an espresso shot.", price:6.20, group:"warmdrink", tag:"vegan", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Hot Chocolate", desc:"", price:5.00, group:"warmdrink" },
+      { name:"Espresso Single", desc:"", price:3.10, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Espresso Double", desc:"", price:3.10, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Arabic Style Espresso Double", desc:"With cardamom.", price:4.10, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Mild Coffee", desc:"", price:3.80, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Americano", desc:"", price:4.00, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Caffè Crema", desc:"", price:3.90, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Cappuccino", desc:"", price:4.40, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Latte Macchiato", desc:"", price:5.00, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Flat White", desc:"", price:5.50, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Casanova", desc:"Triple espresso shot with milk foam.", price:6.00, group:"warmdrink", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Tea", desc:"Different varieties — ask us!", price:3.80, group:"warmdrink" },
+    ]
+  },
+  {
+    id:"specialwarmdrinks",
+    name:"Super Special Warm Drinks",
+    items:[
+      { name:"Chai Of My Life", desc:"Authentic homemade Masala Chai, special spice blend.", price:5.20, group:"specialwarm", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Warm Me Up Chai", desc:"Authentic homemade Masala Chai, warming spice blend.", price:5.50, group:"specialwarm", choiceGroups:MILK_SERVE_CHOICES },
+      { name:"Golden Glow Latte", desc:"Turmeric, maple syrup, rose petals.", price:5.20, group:"specialwarm",
+        options:[{label:"Vegan (oat milk)", price:0}] },
+      { name:"Pink Sky Latte", desc:"Beetroot powder, sugar, cardamom, cinnamon, ginger, acerola juice powder.", price:5.20, group:"specialwarm",
+        options:[{label:"Vegan (oat milk)", price:0}] },
+      { name:"Too Dirty To Be Chai", desc:"Chai latte with an espresso shot.", price:6.20, group:"specialwarm", choiceGroups:MILK_SERVE_CHOICES },
+    ]
+  },
+];
+
+const DRINK_FILTERS = [
+  {id:"all", label:"All"},
+  {id:"smoothie", label:"Smoothies"},
+  {id:"cooldrink", label:"Cool Drinks"},
+  {id:"water", label:"Water"},
+  {id:"warmdrink", label:"Warm Drinks"},
+  {id:"specialwarm", label:"Super Special"},
 ];
 
 /* ---------------------------------------------------------------
@@ -1140,6 +1303,7 @@ function selectTable(id){
   orderScreen.style.display = "block";
 
   renderMenu();
+  renderDrinksMenu();
   renderTicket();
   window.scrollTo(0,0);
 }
@@ -1216,8 +1380,8 @@ function itemMatchesSearch(item){
 }
 
 function renderMenu(){
-  // Flat, header-less grid for pancake / bowl / drink filters
-  if(activeFilter === "pancake" || activeFilter === "bowl" || activeFilter === "drink"){
+  // Flat, header-less grid for the pancake / bowl filters
+  if(activeFilter === "pancake" || activeFilter === "bowl"){
     const flat = [];
     MENU.forEach(cat=> cat.items.forEach(it=>{ if(itemMatchesFilter(it) && itemMatchesSearch(it)) flat.push(it); }));
 
@@ -1231,7 +1395,7 @@ function renderMenu(){
     } else {
       menuContainer.innerHTML = `<div class="item-grid">${flat.map(itemCardHTML).join("")}</div>`;
     }
-    attachCardHandlers();
+    attachCardHandlers(menuContainer);
     return;
   }
 
@@ -1252,7 +1416,66 @@ function renderMenu(){
     `;
   });
   menuContainer.innerHTML = html || `<div class="empty-state"><span class="big">🔍</span>No dishes match your search.</div>`;
-  attachCardHandlers();
+  attachCardHandlers(menuContainer);
+}
+
+/* ---------------------------------------------------------------
+   RENDER DRINKS PAGE — mirrors the food page's filter/render logic,
+   kept as its own small set of functions/state rather than forcing
+   a shared abstraction, since the two pages diverge slightly (icons,
+   empty-state copy) and this keeps each easy to read on its own.
+--------------------------------------------------------------- */
+const drinksFilterBarEl = document.getElementById("drinksFilterBar");
+const drinksContainer = document.getElementById("drinksContainer");
+let activeDrinksFilter = "all";
+let activeDrinksSearch = "";
+
+function renderDrinksFilterBar(){
+  drinksFilterBarEl.innerHTML = DRINK_FILTERS.map(f=>
+    `<button class="filter-pill ${f.id===activeDrinksFilter?"active":""}" data-filter="${f.id}">${f.label}</button>`
+  ).join("");
+  drinksFilterBarEl.querySelectorAll(".filter-pill").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      activeDrinksFilter = btn.dataset.filter;
+      renderDrinksFilterBar();
+      renderDrinksMenu();
+    });
+  });
+}
+
+function drinksItemMatchesFilter(item){
+  if(activeDrinksFilter === "all") return true;
+  return item.group === activeDrinksFilter;
+}
+function drinksItemMatchesSearch(item){
+  const f = activeDrinksSearch.trim().toLowerCase();
+  if(!f) return true;
+  return item.name.toLowerCase().includes(f) || (item.desc||"").toLowerCase().includes(f);
+}
+
+function renderDrinksMenu(){
+  let html = "";
+  DRINKS_MENU.forEach(cat=>{
+    const items = cat.items.filter(it=> drinksItemMatchesFilter(it) && drinksItemMatchesSearch(it));
+    if(items.length === 0) return;
+    html += `
+      <section class="category-block">
+        <div class="category-head"><h2>${cat.name}</h2></div>
+        ${cat.note ? `<div class="category-note">${cat.note}</div>` : ""}
+        <div class="item-grid">${items.map(itemCardHTML).join("")}</div>
+      </section>
+    `;
+  });
+  if(!html){
+    const label = activeDrinksFilter === "all" ? "drinks" : DRINK_FILTERS.find(f=>f.id===activeDrinksFilter).label.toLowerCase();
+    html = `
+      <div class="empty-state">
+        <span class="big">🥤</span>
+        No ${label} ${activeDrinksSearch ? "match your search" : "on the menu yet"}.
+      </div>`;
+  }
+  drinksContainer.innerHTML = html;
+  attachCardHandlers(drinksContainer);
 }
 
 function itemCardHTML(it){
@@ -1283,22 +1506,96 @@ function itemCardHTML(it){
   `;
 }
 
+// Looks an item up by name across BOTH the food menu and the drinks
+// menu, since a single ticket/table order can hold items from either.
 function findItemByName(name){
   for(const cat of MENU){
+    const it = cat.items.find(i=>i.name===name);
+    if(it) return it;
+  }
+  for(const cat of DRINKS_MENU){
     const it = cat.items.find(i=>i.name===name);
     if(it) return it;
   }
   return null;
 }
 
-function attachCardHandlers(){
-  menuContainer.querySelectorAll(".customize-icon-btn").forEach(btn=>{
+/* ---------------------------------------------------------------
+   KITCHEN BROADCAST — splits a sent order across the 3 kitchen
+   stations and pushes each station's slice to Firebase, so each
+   station's phone (kitchen-display.html) only ever sees its own
+   items. This section is entirely additive: if FIREBASE_CONFIG below
+   is left as the placeholder, "Send order to kitchen" behaves exactly
+   as it always has (clears the ticket, no broadcast, no errors).
+
+   To activate: create a free Firebase project at
+   https://console.firebase.google.com → Build → Realtime Database,
+   then Project settings → your web app → copy the config values in
+   below. Use the SAME config in kitchen-display.html.
+--------------------------------------------------------------- */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCgVv9ANGiB3m0UNzFmx-UHRxsOkUjl9C8",
+  authDomain: "swap-s-ordering-system.firebaseapp.com",
+  databaseURL: "https://swap-s-ordering-system-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "swap-s-ordering-system",
+};
+
+let kitchenDb = null;
+if(FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY"){
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    kitchenDb = firebase.database();
+  } catch(e){
+    console.error("Firebase init failed — kitchen broadcast disabled:", e);
+  }
+}
+
+// Station routing — matches how the 3 kitchen phones are staffed:
+//  · pancakeBowlSmoothie: pancakes, smoothie bowls, natural smoothies
+//  · hotFoodEggsSalad: every egg dish + the salads (the "food" group)
+//  · drinks: water, everyday coffees, and the Super Special warm drinks
+function stationForItemName(name){
+  const it = findItemByName(name);
+  if(!it) return null;
+  if(it.group === "pancake" || it.group === "bowl" || it.group === "smoothie") return "pancakeBowlSmoothie";
+  if(it.group === "food") return "hotFoodEggsSalad";
+  if(["cooldrink","water","warmdrink","specialwarm"].includes(it.group)) return "drinks";
+  return null;
+}
+
+function broadcastOrderToKitchen(tableId, guests, lines){
+  if(!kitchenDb) return;
+  const buckets = {pancakeBowlSmoothie:[], hotFoodEggsSalad:[], drinks:[]};
+  lines.forEach(line=>{
+    const station = stationForItemName(line.name);
+    if(!station) return;
+    buckets[station].push({
+      name: line.name,
+      qty: line.qty,
+      mods: line.mods.map(m=>m.label),
+      note: line.note || ""
+    });
+  });
+  Object.keys(buckets).forEach(station=>{
+    if(buckets[station].length === 0) return;
+    kitchenDb.ref("stationOrders/"+station).push({
+      table: tableId,
+      guests: guests || "",
+      createdAt: Date.now(),
+      status: "pending",
+      items: buckets[station]
+    });
+  });
+}
+
+function attachCardHandlers(container){
+  container.querySelectorAll(".customize-icon-btn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const item = findItemByName(btn.dataset.name);
       openItemModal(item);
     });
   });
-  menuContainer.querySelectorAll(".qty-stepper").forEach(stepper=>{
+  container.querySelectorAll(".qty-stepper").forEach(stepper=>{
     const name = stepper.dataset.name;
     stepper.querySelector(".plus").addEventListener("click", ()=> bumpPlainLine(name, 1));
     stepper.querySelector(".minus").addEventListener("click", ()=> bumpPlainLine(name, -1));
@@ -1347,11 +1644,14 @@ function totalQtyForItem(name){
   return order.filter(l=>l.name===name).reduce((s,l)=>s+l.qty,0);
 }
 
-/* Re-render the menu grid from current state, so every card's stepper
-   value and "on ticket" badge always reflects the order exactly —
-   simpler and less error-prone than patching individual DOM nodes. */
+/* Re-render both pages' grids from current state, so every card's
+   stepper value and "in-order" tint always reflects the order exactly
+   — simpler and less error-prone than patching individual DOM nodes.
+   Both pages stay mounted in the DOM (for the swipe animation), so
+   both need refreshing regardless of which one is currently visible. */
 function refreshCardSteppers(){
   renderMenu();
+  renderDrinksMenu();
 }
 
 /* ---------------------------------------------------------------
@@ -1436,7 +1736,7 @@ function renderModal(){
 
   modalBody.innerHTML = `
     <h3>${it.name}</h3>
-    <div class="modal-desc">${it.desc}</div>
+    ${it.desc ? `<div class="modal-desc">${it.desc}</div>` : ""}
     <div class="modal-qty-row">
       <span class="qty-label">How many ${it.name} for this table?</span>
       <div class="qty-group">
@@ -1608,6 +1908,8 @@ sendBtn.addEventListener("click", ()=>{
   if(!currentTable || order.length===0) return;
   const totalPrice = order.reduce((s,l)=>s+l.unitPrice*l.qty,0);
   const sentTable = currentTable;
+  const guests = (tableMeta[currentTable] && tableMeta[currentTable].guests) || "";
+  broadcastOrderToKitchen(sentTable, guests, order);
   showToast(`Order sent for Table ${sentTable} — ${fmt(totalPrice)}`);
   order.length = 0;
   goToTableSelect();
@@ -1633,6 +1935,48 @@ document.getElementById("searchBox").addEventListener("input", (e)=>{
   activeSearch = e.target.value;
   renderMenu();
 });
+document.getElementById("drinksSearchBox").addEventListener("input", (e)=>{
+  activeDrinksSearch = e.target.value;
+  renderDrinksMenu();
+});
+
+/* ---------------------------------------------------------------
+   PAGE SWIPE — Food and Drinks live side by side on a sliding track.
+   Tapping a tab or swiping switches between them, so the drinks menu
+   doesn't force a long scroll past the whole food menu to reach.
+--------------------------------------------------------------- */
+let currentPage = "food"; // "food" | "drinks"
+const pagesTrack = document.getElementById("pagesTrack");
+const pagesViewport = document.getElementById("pagesViewport");
+
+function goToPage(page){
+  currentPage = page;
+  pagesTrack.style.transform = page === "drinks" ? "translateX(-50%)" : "translateX(0)";
+  document.querySelectorAll(".page-tab").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.page === page);
+  });
+}
+
+document.querySelectorAll(".page-tab").forEach(btn=>{
+  btn.addEventListener("click", ()=> goToPage(btn.dataset.page));
+});
+
+let swipeStartX = 0, swipeStartY = 0, swiping = false;
+pagesViewport.addEventListener("touchstart", (e)=>{
+  swipeStartX = e.touches[0].clientX;
+  swipeStartY = e.touches[0].clientY;
+  swiping = true;
+}, {passive:true});
+pagesViewport.addEventListener("touchend", (e)=>{
+  if(!swiping) return;
+  swiping = false;
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  const dy = e.changedTouches[0].clientY - swipeStartY;
+  if(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5){
+    if(dx > 0 && currentPage === "food") goToPage("drinks");   // swipe right -> Drinks
+    else if(dx < 0 && currentPage === "drinks") goToPage("food"); // swipe left -> back to Food
+  }
+}, {passive:true});
 
 /* ---------------------------------------------------------------
    TOAST
@@ -1651,6 +1995,8 @@ function showToast(msg){
    only becomes visible once a table has been chosen.
 --------------------------------------------------------------- */
 renderFilterBar();
+renderDrinksFilterBar();
+renderDrinksMenu();
 renderTableGrid();
 </script>
 </body>
