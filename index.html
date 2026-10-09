@@ -137,6 +137,141 @@
     min-width:0;
   }
 
+  /* ---------- Chat-style ordering (alternative to browsing the
+     Food/Drinks grids — type a dish, tap a suggestion, it opens the
+     usual customize sheet, and the running log doubles as a view of
+     everything added to this table's order) ---------- */
+  .chat-panel{
+    display:none;
+    flex-direction:column;
+    min-height:60vh;
+  }
+  .chat-panel.active{ display:flex; }
+  .chat-log{
+    padding:20px 26px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    flex:1;
+  }
+  .chat-empty{
+    font-family:'Inter',sans-serif;
+    font-size:14.5px;
+    color:var(--ink-soft);
+    text-align:center;
+    margin:auto 0;
+    line-height:1.5;
+  }
+  .chat-bubble{
+    align-self:flex-end;
+    max-width:80%;
+    background:var(--forest);
+    color:var(--cream);
+    border-radius:16px 16px 4px 16px;
+    padding:10px 14px;
+  }
+  .chat-bubble .cb-name{
+    font-family:'Montserrat Alternates',sans-serif;
+    font-weight:700;
+    font-size:14.5px;
+  }
+  .chat-bubble .cb-qty{
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    opacity:.85;
+    margin-left:6px;
+  }
+  .chat-bubble .cb-mods{
+    font-family:'Inter',sans-serif;
+    font-size:12.5px;
+    opacity:.9;
+    margin-top:3px;
+  }
+  .chat-bubble .cb-sent{
+    font-family:'Inter',sans-serif;
+    font-size:11px;
+    opacity:.75;
+    margin-top:4px;
+  }
+  .chat-suggestions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    padding:0 26px 10px;
+  }
+  .chat-tag{
+    border:1px solid var(--forest);
+    background:var(--sage);
+    color:var(--forest-dark);
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    padding:8px 14px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:background .15s, color .15s;
+  }
+  .chat-preview{
+    width:100%;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    color:var(--forest-dark);
+    background:var(--paper);
+    border:1px dashed var(--forest);
+    border-radius:10px;
+    padding:8px 12px;
+  }
+  .chat-tag-group{ width:100%; }
+  .chat-tag-label{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .chat-tag-row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chat-tag:hover{ background:var(--forest); color:var(--cream); }
+  .chat-tag.no-match{
+    border-color:var(--line);
+    background:var(--paper);
+    color:var(--ink-soft);
+    cursor:default;
+  }
+  .chat-input-row{
+    display:flex;
+    gap:10px;
+    padding:12px 26px;
+    border-top:1px solid var(--line);
+    background:var(--paper);
+    position:sticky;
+    bottom:0;
+    z-index:20;
+  }
+  .chat-input-row input{
+    flex:1;
+    padding:11px 14px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:var(--cream);
+    font-family:'Inter',sans-serif;
+    font-size:15.5px;
+    color:var(--ink);
+  }
+  .chat-input-row input:focus{ outline:2px solid var(--coral); outline-offset:1px; }
+  .chat-send-btn{
+    width:42px; height:42px;
+    flex-shrink:0;
+    border-radius:50%;
+    border:none;
+    background:var(--coral);
+    color:#fff;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s;
+  }
+  .chat-send-btn:hover{ background:var(--coral-dark); }
+
   /* ---------- Filter pills + search (one combined sticky block,
      so there's no gap/overlap between it and the tabs above it,
      and the search box scrolls WITH the pills instead of sliding
@@ -876,6 +1011,9 @@
     .filter-bar{ padding:12px 14px 8px; }
     .search-row{ padding:0 14px 12px; }
     .page-tab{ font-size:13px; padding:11px 8px; }
+    .chat-log{ padding:16px 14px 12px; }
+    .chat-suggestions{ padding:0 14px 10px; }
+    .chat-input-row{ padding:10px 14px; }
     aside.ticket{
       position:fixed;
       bottom:0; left:0; right:0;
@@ -971,8 +1109,9 @@
     <div class="page-tabs">
       <button class="page-tab active" data-page="food">🍽️ Food</button>
       <button class="page-tab" data-page="drinks">🥤 Drinks</button>
+      <button class="page-tab" data-page="chat">💬 Chat</button>
     </div>
-    <div class="pages-clip">
+    <div class="pages-clip" id="pagesClip">
       <div class="pages-track" id="pagesTrack">
         <section class="page-panel">
           <div class="sticky-controls">
@@ -997,6 +1136,19 @@
           </main>
         </section>
       </div>
+    </div>
+
+    <div class="chat-panel" id="chatPanel">
+      <div class="chat-log" id="chatLog"></div>
+      <div class="chat-suggestions" id="chatSuggestions"></div>
+      <form class="chat-input-row" id="chatInputForm">
+        <input type="text" id="chatInput" placeholder="e.g. 2 eggo · sunny stack gluten free · conqueror without mozzarella" autocomplete="off">
+        <button type="submit" class="chat-send-btn" aria-label="Send">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </form>
     </div>
   </div>
 
@@ -1647,6 +1799,84 @@ function findItemByName(name){
 }
 
 /* ---------------------------------------------------------------
+   CHAT-STYLE ORDERING — a 3rd way to build the same order as the
+   Food/Drinks grids (it's just another entry point into
+   addOrUpdateLine/openItemModal, never a separate data model). The
+   waiter types a dish/drink name, gets tappable suggestion tags, and
+   tapping one opens the normal customize sheet. The chat log itself
+   is just the existing `order` array rendered as bubbles, so it's
+   always exactly in sync with the ticket — no separate state to
+   drift out of date.
+--------------------------------------------------------------- */
+const ALL_ITEMS_FLAT = [...MENU, ...DRINKS_MENU].flatMap(cat => cat.items);
+
+// Lowercases and turns punctuation/hyphens/quotes into spaces, so
+// "Eggo-Cardo" and "eggo cardo" compare as equal.
+function normText(s){
+  return String(s).toLowerCase().replace(/[^a-z0-9äöüß]+/g, " ").trim();
+}
+
+// Small Levenshtein distance so a typo'd/partial name ("pancke",
+// "blue lagoo") still resolves to the right dish instead of coming up
+// empty.
+function levenshtein(a, b){
+  a = a.toLowerCase(); b = b.toLowerCase();
+  const m = a.length, n = b.length;
+  const dp = Array.from({length:m+1}, ()=> new Array(n+1).fill(0));
+  for(let i=0;i<=m;i++) dp[i][0] = i;
+  for(let j=0;j<=n;j++) dp[0][j] = j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      if(a[i-1]===b[j-1]) dp[i][j] = dp[i-1][j-1];
+      else dp[i][j] = 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// Scores a menu item against the typed query: 0 = no match at all,
+// higher = better match. Exact match and "starts with" rank highest
+// (so typing "pan" favors "Pancake Bouquet" over something merely
+// typo-close), substring match next, then typo-tolerant distance
+// against the name and against each individual word in it (so
+// "lagoo" still finds "Blue Lagoon Bowl").
+function fuzzyScore(query, name){
+  const q = normText(query);
+  const n = normText(name);
+  if(!q) return 0;
+  if(q === n) return 1000;
+  if(n.startsWith(q)) return 900 - (n.length - q.length);
+  if(n.includes(q)) return 700 - (n.length - q.length);
+
+  const words = n.split(/\s+/);
+  let best = 0;
+  for(const w of words){
+    if(w.startsWith(q)) best = Math.max(best, 650 - (w.length - q.length));
+  }
+  if(best > 0) return best;
+
+  // Typo tolerance: allow roughly up to a third of the query length
+  // in edits before giving up, scaled so closer matches score higher.
+  const maxEdits = Math.max(1, Math.floor(q.length / 3));
+  const wholeDist = levenshtein(q, n);
+  let minWordDist = Infinity;
+  for(const w of words) minWordDist = Math.min(minWordDist, levenshtein(q, w));
+  const dist = Math.min(wholeDist, minWordDist);
+  if(dist <= maxEdits) return 400 - dist*40;
+  return 0;
+}
+
+// Returns the best-matching items for a typed query, best first.
+function searchItems(query, limit){
+  if(!query || !query.trim()) return [];
+  const scored = ALL_ITEMS_FLAT
+    .map(it => ({ it, score: fuzzyScore(query, it.name) }))
+    .filter(x => x.score > 0)
+    .sort((a,b)=> b.score - a.score);
+  return scored.slice(0, limit || 6).map(x => x.it);
+}
+
+/* ---------------------------------------------------------------
    KITCHEN BROADCAST — splits a sent order across the 3 kitchen
    stations and pushes each station's slice to Firebase, so each
    station's phone (kitchen-display.html) only ever sees its own
@@ -2015,7 +2245,238 @@ function renderTicket(){
   ticketMeta.textContent = currentTable
     ? `Table ${currentTable}${guests ? " · " + guests + " guests" : ""}`
     : "No table selected";
+
+  renderChatLog();
 }
+
+/* Renders the chat log purely from `order` — so it's always exactly
+   what's been added to this table, sent or not, with no state of its
+   own to fall out of sync. */
+function renderChatLog(){
+  const chatLog = document.getElementById("chatLog");
+  if(!chatLog) return;
+  if(order.length === 0){
+    chatLog.innerHTML = `<div class="chat-empty">Type a dish or drink below to start this table's order.<br>Tap a suggestion to customize and add it.</div>`;
+    return;
+  }
+  chatLog.innerHTML = order.map(line=>{
+    const modsText = line.mods.length
+      ? line.mods.map(m=>m.label).join(" · ")
+      : "";
+    let sentText = "";
+    if(line.sentQty > 0 && line.sentQty === line.qty) sentText = "✓ Sent to kitchen";
+    else if(line.sentQty > 0 && line.sentQty < line.qty) sentText = `✓ ${line.sentQty} sent · ${line.qty - line.sentQty} new`;
+    return `
+      <div class="chat-bubble">
+        <span class="cb-name">${line.name}</span><span class="cb-qty">×${line.qty}</span>
+        ${modsText ? `<div class="cb-mods">${modsText}</div>` : ""}
+        ${line.note ? `<div class="cb-mods">📝 ${line.note}</div>` : ""}
+        ${sentText ? `<div class="cb-sent">${sentText}</div>` : ""}
+      </div>
+    `;
+  }).join("");
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+/* ---------------------------------------------------------------
+   FREE-TEXT PARSING — "2 eggo", "sunny stack gluten free toasted
+   bread", "conqurer without mozzarella". The text is split into:
+   quantity → dish name (typo-tolerant) → modifier phrases. Phrases
+   that match one of the dish's real options/extras/add-ons/choices
+   become proper priced modifiers; everything else (e.g. "cooked
+   eggs", "without mozzarella") goes into the kitchen note verbatim.
+--------------------------------------------------------------- */
+const NUM_WORDS = {one:1,two:2,three:3,four:4,five:5,six:6,ein:1,eine:1,zwei:2,drei:3,vier:4};
+const MOD_STOPWORDS = new Set(["not","made","in","with","without","the","of","a","and","no"]);
+const PHRASE_SPLIT = /\s*(?:,|;|\+|\band\b|\bwith\b|\bplus\b|\bund\b|\bmit\b)\s*|\s+(?=\b(?:without|no|ohne|kein|keine)\b)/i;
+
+function rankItems(q){
+  return ALL_ITEMS_FLAT
+    .map(it => ({ it, score: fuzzyScore(q, it.name) }))
+    .filter(x => x.score > 0)
+    .sort((a,b)=> b.score - a.score);
+}
+
+function parseChatInput(text){
+  let s = text.trim();
+  if(!s) return null;
+  let qty = 1;
+  let m = s.match(/^(\d{1,2})\s*(?:x|×)?\s*(.*)$/i);
+  if(m){ qty = Math.min(20, Math.max(1, parseInt(m[1],10))); s = m[2].trim(); }
+  else {
+    m = s.match(/^(one|two|three|four|five|six|ein|eine|zwei|drei|vier)\s+(.+)$/i);
+    if(m){ qty = NUM_WORDS[m[1].toLowerCase()]; s = m[2].trim(); }
+  }
+  const words = s.split(/\s+/).filter(Boolean);
+  if(words.length === 0) return null;
+  // Try the first 1..5 words as the dish name; keep the prefix whose
+  // best match scores highest (longer prefix wins ties), so the rest
+  // of the text is treated as modifiers.
+  let best = null;
+  for(let k=1; k<=Math.min(words.length,5); k++){
+    const ranked = rankItems(words.slice(0,k).join(" "));
+    const score = ranked.length ? ranked[0].score : 0;
+    if(score > 0 && (!best || score >= best.score)){
+      best = { k, score, ranked };
+    }
+  }
+  if(!best) return { qty, rest: "", ranked: [], confident: false };
+  const ranked = best.ranked;
+  const confident = best.score >= 300 &&
+    (ranked.length < 2 || best.score - ranked[1].score >= 100 || best.score >= 1000);
+  return { qty, rest: words.slice(best.k).join(" "), ranked, confident };
+}
+
+function tokMatch(a, b){
+  if(a === b) return true;
+  if(a.length >= 3 && b.startsWith(a)) return true;
+  return a.length >= 4 && b.length >= 4 && levenshtein(a, b) <= (a.length >= 5 ? 2 : 1);
+}
+
+// Fixes typos in free-text note words against words the dish itself
+// uses (its description and option names) — "mozerellla" → "mozzarella".
+function autocorrectNote(item, phrase){
+  const vocab = new Set();
+  const src = [item.desc || "", item.name]
+    .concat([item.options, item.extras, item.addons].flatMap(l => (l || []).map(o => o.label)))
+    .concat((item.choiceGroups || []).flatMap(g => g.choices.map(c => c.label)));
+  src.forEach(t => normText(t).split(" ").forEach(w => { if(w.length >= 5) vocab.add(w); }));
+  return phrase.split(/\s+/).map(w => {
+    const n = normText(w);
+    if(n.length < 5 || vocab.has(n)) return w;
+    const allowed = n.length >= 9 ? 3 : 2;
+    let best = null, bd = allowed + 1;
+    vocab.forEach(v => {
+      if(v[0] !== n[0]) return;
+      const d = levenshtein(n, v);
+      if(d < bd){ bd = d; best = v; }
+    });
+    return best ? best : w;
+  }).join(" ");
+}
+
+function mapModifiers(item, rest){
+  const cands = [];
+  const add = (prefix, list, group) => (list || []).forEach((o,i)=>
+    cands.push({ key: prefix+i, label:o.label, price:o.price, group: group || null }));
+  add("opt-", item.options);
+  add("ext-", item.extras);
+  add("add-", item.addons);
+  (item.choiceGroups || []).forEach(g => add("cg-"+g.key+"-", g.choices, g.key));
+  add("alg-", item.allergies !== undefined ? item.allergies : ALLERGY_FLAGS);
+
+  const mods = [], notes = [];
+  rest.split(PHRASE_SPLIT).map(x=>x.trim()).filter(Boolean).forEach(ph=>{
+    if(/^(without|no|ohne|kein|keine|hold|minus)\b/i.test(ph)){ notes.push(autocorrectNote(item, ph)); return; }
+    const ptoks = normText(ph).split(" ").filter(Boolean);
+    let best = null, bestShare = 0;
+    cands.forEach(c=>{
+      const ltoks = normText(c.label).split(" ").filter(t=>t && !MOD_STOPWORDS.has(t));
+      if(!ltoks.length) return;
+      const covered = ptoks.every(p => ltoks.some(l => tokMatch(p, l)));
+      if(!covered) return;
+      const share = ltoks.filter(l => ptoks.some(p => tokMatch(p, l))).length / ltoks.length;
+      if(share >= 0.5 && share > bestShare){ best = c; bestShare = share; }
+    });
+    if(!best){ notes.push(autocorrectNote(item, ph)); return; }
+    const idx = mods.findIndex(x => x.key === best.key || (best.group && x.group === best.group));
+    if(idx > -1) mods.splice(idx, 1);
+    mods.push(best);
+    // e.g. label "(not toasted)" but the waiter said "toasted":
+    // keep their exact words as a note so the kitchen sees the conflict.
+    const ltoksAll = normText(best.label).split(" ");
+    const ni = ltoksAll.indexOf("not");
+    if(ni > -1 && !ptoks.includes("not") &&
+       ltoksAll.slice(ni+1).some(w => ptoks.some(p => tokMatch(p, w)))){
+      notes.push(autocorrectNote(item, ph));
+    }
+  });
+  return {
+    mods: mods.map(m => ({ key:m.key, label:m.label, price:m.price })),
+    note: notes.join("; ")
+  };
+}
+
+function describeParsed(item, p){
+  const r = mapModifiers(item, p.rest);
+  const bits = [`${p.qty}× ${item.name}`];
+  r.mods.forEach(m => bits.push(m.label));
+  if(r.note) bits.push("📝 " + r.note);
+  return bits.join(" · ");
+}
+
+function addParsedLine(item, p){
+  const r = mapModifiers(item, p.rest);
+  addOrUpdateLine(item, r.mods, r.note, p.qty);
+  renderTicket();
+  refreshCardSteppers();
+  showToast(`${p.qty}× ${item.name} added to ticket`);
+}
+
+function finishChatEntry(){
+  const input = document.getElementById("chatInput");
+  input.value = "";
+  renderChatSuggestions("");
+  input.focus();
+}
+
+/* Suggestion tags (+ a one-line preview of what Enter will add).
+   A plain name opens the customize sheet when tapped; free text with
+   a quantity or extra words adds straight to the order. */
+function renderChatSuggestions(text){
+  const box = document.getElementById("chatSuggestions");
+  if(!box) return;
+  const p = text.trim() ? parseChatInput(text) : null;
+  if(!p){ box.innerHTML = ""; return; }
+  if(p.ranked.length === 0){
+    box.innerHTML = `<span class="chat-tag no-match">No matching dish or drink</span>`;
+    return;
+  }
+  const drinkNames = new Set(DRINKS_MENU.flatMap(c => c.items.map(i => i.name)));
+  const foodTags = p.ranked.filter(x => !drinkNames.has(x.it.name)).slice(0, 5).map(x => x.it);
+  const drinkTags = p.ranked.filter(x => drinkNames.has(x.it.name)).slice(0, 5).map(x => x.it);
+  const preview = p.confident && (p.rest || p.qty > 1)
+    ? `<div class="chat-preview">↵ Adds: ${describeParsed(p.ranked[0].it, p)}</div>` : "";
+  const tagBtn = it => `<button type="button" class="chat-tag" data-name="${escapeAttr(it.name)}">${it.name}</button>`;
+  const group = (label, list) => list.length
+    ? `<div class="chat-tag-group"><div class="chat-tag-label">${label}</div><div class="chat-tag-row">${list.map(tagBtn).join("")}</div></div>` : "";
+  box.innerHTML = preview + group("🍽️ Food", foodTags) + group("🥤 Drinks", drinkTags);
+  box.querySelectorAll(".chat-tag:not(.no-match)").forEach(tag=>{
+    tag.addEventListener("click", ()=>{
+      const item = findItemByName(tag.dataset.name);
+      if(!item) return;
+      if(p.rest || p.qty > 1) addParsedLine(item, p);
+      else openItemModal(item);
+      finishChatEntry();
+    });
+  });
+}
+
+/* Enter/send: a confident dish match with extra words or a quantity
+   is added directly with the parsed modifiers/note; a plain dish name
+   opens the customize sheet; an ambiguous dish keeps the tags up. */
+function handleChatSubmit(){
+  const input = document.getElementById("chatInput");
+  const p = parseChatInput(input.value);
+  if(!p) return;
+  if(p.ranked.length === 0 || !p.confident){
+    renderChatSuggestions(input.value);
+    showToast(p.ranked.length ? "Pick the dish from the suggestions" : "No matching dish or drink");
+    return;
+  }
+  const item = p.ranked[0].it;
+  if(p.rest || p.qty > 1) addParsedLine(item, p);
+  else openItemModal(item);
+  finishChatEntry();
+}
+
+document.getElementById("chatInput").addEventListener("input", (e)=>{
+  renderChatSuggestions(e.target.value);
+});
+document.getElementById("chatInputForm").addEventListener("submit", (e)=>{
+  e.preventDefault();
+  handleChatSubmit();
+});
 
 function changeQty(uid, delta){
   const line = order.find(l=>l.uid===uid);
@@ -2162,7 +2623,17 @@ window.addEventListener("scroll", ()=>{
 
 function goToPage(page){
   currentPage = page;
-  pagesTrack.style.transform = page === "drinks" ? "translateX(-50%)" : "translateX(0)";
+  const pagesClip = document.getElementById("pagesClip");
+  const chatPanel = document.getElementById("chatPanel");
+  if(page === "chat"){
+    pagesClip.style.display = "none";
+    chatPanel.classList.add("active");
+    renderChatLog();
+  } else {
+    pagesClip.style.display = "";
+    chatPanel.classList.remove("active");
+    pagesTrack.style.transform = page === "drinks" ? "translateX(-50%)" : "translateX(0)";
+  }
   document.querySelectorAll(".page-tab").forEach(btn=>{
     btn.classList.toggle("active", btn.dataset.page === page);
   });
