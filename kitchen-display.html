@@ -4,38 +4,227 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Brunch O'Clock — Kitchen Display</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Montserrat+Alternates:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://static.sumup.com" crossorigin>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
-  :root{
-    --cream:#FBF6EC;
-    --paper:#FFFFFF;
-    --ink:#2B2B24;
-    --ink-soft:#6B6A5E;
-    --forest:#2F4A3D;
-    --forest-dark:#20342A;
-    --coral:#E2895A;
-    --coral-dark:#C96F42;
-    --yolk:#EFB93F;
-    --line:#E7E0D0;
-    --sage:#DCE6DA;
-    --danger:#B5493A;
-    --ok-green:#3F8452;
-    --warn-yellow:#C99A1F;
-    --radius:14px;
+  /* =================================================================
+     SumUp Circuit UI — design tokens (source: @sumup-oss/design-tokens,
+     light theme + shared scale, values verbatim).
+     Docs: https://circuit.sumup.com
+  ================================================================= */
+
+  /* --- Fonts (official SumUp faces + metric-matched Arial fallbacks) --- */
+  @font-face{
+    font-family:"SumUp Narrow fallback"; font-style:normal; font-weight:375;
+    src:local("Arial"); size-adjust:95%; ascent-override:101.1%; descent-override:26.6%; line-gap-override:0%;
   }
-  *{ box-sizing:border-box; }
-  html,body{ height:100%; }
-  body{
-    margin:0;
-    background:var(--cream);
-    color:var(--ink);
-    font-family:'Inter',sans-serif;
-    -webkit-font-smoothing:antialiased;
+  @font-face{
+    font-family:"SumUp Narrow fallback"; font-style:normal; font-weight:550;
+    src:local("Arial"); size-adjust:97.5%; ascent-override:101.1%; descent-override:26.6%; line-gap-override:0%;
+  }
+  @font-face{
+    font-family:"SumUp Narrow fallback"; font-style:normal; font-weight:650;
+    src:local("Arial Bold"), local("Arial"); size-adjust:90%; ascent-override:101%; descent-override:26.6%; line-gap-override:0%;
+  }
+  @font-face{
+    font-family:"SumUp Narrow"; font-style:normal; font-weight:300 700; font-display:swap;
+    src:url("https://static.sumup.com/fonts/sumup/sumup-narrow-latin-l.woff2") format("woff2-variations");
+    unicode-range:U+0020-007E, U+00A0-017E, U+018F, U+0192, U+019D, U+01A0-01A1, U+01AF-01B0, U+01C4-01CC, U+01E6-01E7, U+01EA-01EB, U+01F1-01F3, U+01FA-021B, U+022A-022D, U+0230-0233, U+0237, U+0259, U+0272, U+02B9, U+02BB-02BC, U+02C6-02C7, U+02C9, U+02D8-02DD, U+0300-0304, U+0306-030D, U+030F, U+0311-0313, U+0315, U+031B, U+0320, U+0323-0329, U+032D-0332, U+0335, U+035C-035D, U+0361, U+1DC6-1DC7, U+1E20-1E21, U+1E80-1E85, U+1E9E, U+1EA0-1EF9, U+2013-2014, U+2018-2022, U+2026, U+2030, U+2032-2033, U+2039-203A, U+2042, U+2044, U+2058-2059, U+2070, U+2074-2079, U+2080-2089, U+20A1, U+20A3-20A4, U+20A6-20A7, U+20A9, U+20AB-20AD, U+20B1-20B2, U+20B5, U+20B9-20BA, U+20BC-20BD, U+2116-2117, U+2122, U+212E, U+2153-2154, U+215B-215E, U+2190-2199, U+21A4, U+21A6, U+21A9-21AA, U+2212, U+2215, U+2217, U+2219, U+2248, U+2260, U+2264-2265, U+2588, U+2591-2593, U+25A0-25A2, U+25AE-25AF, U+25B2-25B3, U+25B6-25B7, U+25BC-25BD, U+25C0-25C1, U+25C6-25C7, U+25CA-25CB, U+25CF-25D3, U+25D6-25D7, U+25E2-25E5, U+25E7-25EA, U+25EC-25EE, U+25F4-25F7, U+2600, U+2605-2606, U+2611-2612, U+2639-263B, U+2665, U+2714, U+2718, U+271A, U+272A, U+275B-275E, U+2770-2771, U+27F5-27F6, U+29BE-29BF, U+29D6-29D7, U+2B12-2B15, U+3008-3009, U+3010-3011, U+3016-3017, U+FB01-FB02;
+  }
+  @font-face{
+    font-family:"SumUp Narrow"; font-style:normal; font-weight:300 700; font-display:swap;
+    src:url("https://static.sumup.com/fonts/sumup/sumup-narrow-latin-s.woff2") format("woff2-variations");
+    unicode-range:U+0020-007E, U+00A0-017E, U+018F, U+0192, U+019D, U+01C4-01CC, U+01E6-01E7, U+01EA-01EB, U+01F1-01F3, U+01FA-021B, U+022A-022D, U+0230-0233, U+0237, U+0259, U+0272, U+02B9, U+02BB-02BC, U+02C6-02C7, U+02C9, U+02D8-02DD, U+0300-0304, U+0306-0308, U+030A-030D, U+030F, U+0311-0313, U+0315, U+0320, U+0324-0329, U+032D-0332, U+0335, U+035C-035D, U+0361, U+1DC6-1DC7, U+1E20-1E21, U+1E80-1E85, U+1E9E, U+1EBC-1EBD, U+1EF2-1EF3, U+1EF8-1EF9, U+2013-2014, U+2018-201F, U+2022, U+2026, U+2030, U+2039-203A, U+2044, U+2070, U+2074-2079, U+2080-2089, U+20A1, U+20A3-20A4, U+20A6-20A7, U+20A9, U+20AB-20AD, U+20B1-20B2, U+20B5, U+20B9-20BA, U+20BC-20BD, U+2116-2117, U+2122, U+212E, U+2153-2154, U+215B-215E, U+2190-2199, U+21A4, U+21A6, U+21A9-21AA, U+2212, U+2248, U+2260, U+2264-2265, U+27F5-27F6, U+FB01-FB02;
+  }
+  @font-face{
+    font-family:"SumUp Black fallback"; font-style:normal; font-weight:bold;
+    src:local("Arial Black"), local("Arial Bold"), local("Arial");
+    size-adjust:90.1%; ascent-override:102%; descent-override:28%; line-gap-override:0%;
+  }
+  @font-face{
+    font-family:"SumUp Black"; font-style:normal; font-weight:bold; font-display:swap;
+    src:url("https://static.sumup.com/fonts/sumup/sumup-black-latin-l.woff2") format("woff2");
+    unicode-range:U+0020-007E, U+00A0-017E, U+018F, U+0192, U+019D, U+01A0-01A1, U+01AF-01B0, U+01C4-01CC, U+01E6-01E7, U+01EA-01EB, U+01F1-01F3, U+01FA-021B, U+022A-022D, U+0230-0233, U+0237, U+0259, U+0272, U+02B9, U+02BB-02BC, U+02C6-02C7, U+02C9, U+02D8-02DD, U+0300-0304, U+0306-030D, U+030F, U+0311-0313, U+0315, U+031B, U+0320, U+0323-0329, U+032D-0332, U+0335, U+035C-035D, U+0361, U+1DC6-1DC7, U+1E20-1E21, U+1E80-1E85, U+1E9E, U+1EA0-1EF9, U+2013-2014, U+2018-2022, U+2026, U+2030, U+2032-2033, U+2039-203A, U+2042, U+2044, U+2058-2059, U+2070, U+2074-2079, U+2080-2089, U+20A1, U+20A3-20A4, U+20A6-20A7, U+20A9, U+20AB-20AD, U+20B1-20B2, U+20B5, U+20B9-20BA, U+20BC-20BD, U+2116-2117, U+2122, U+212E, U+2153-2154, U+215B-215E, U+2190-2199, U+21A4, U+21A6, U+21A9-21AA, U+2212, U+2215, U+2217, U+2219, U+2248, U+2260, U+2264-2265, U+2588, U+2591-2593, U+25A0-25A2, U+25AE-25AF, U+25B2-25B3, U+25B6-25B7, U+25BC-25BD, U+25C0-25C1, U+25C6-25C7, U+25CA-25CB, U+25CF-25D3, U+25D6-25D7, U+25E2-25E5, U+25E7-25EA, U+25EC-25EE, U+25F4-25F7, U+2600, U+2605-2606, U+2611-2612, U+2639-263B, U+2665, U+2714, U+2718, U+271A, U+272A, U+275B-275E, U+2770-2771, U+27F5-27F6, U+29BE-29BF, U+29D6-29D7, U+2B12-2B15, U+3008-3009, U+3010-3011, U+3016-3017, U+FB01-FB02;
+  }
+  @font-face{
+    font-family:"SumUp Black"; font-style:normal; font-weight:bold; font-display:swap;
+    src:url("https://static.sumup.com/fonts/sumup/sumup-black-latin-s.woff2") format("woff2");
+    unicode-range:U+0020-007E, U+00A0-017E, U+018F, U+0192, U+019D, U+01C4-01CC, U+01E6-01E7, U+01EA-01EB, U+01F1-01F3, U+01FA-021B, U+022A-022D, U+0230-0233, U+0237, U+0259, U+0272, U+02B9, U+02BB-02BC, U+02C6-02C7, U+02C9, U+02D8-02DD, U+0300-0304, U+0306-0308, U+030A-030D, U+030F, U+0311-0313, U+0315, U+0320, U+0324-0329, U+032D-0332, U+0335, U+035C-035D, U+0361, U+1DC6-1DC7, U+1E20-1E21, U+1E80-1E85, U+1E9E, U+1EBC-1EBD, U+1EF2-1EF3, U+1EF8-1EF9, U+2013-2014, U+2018-201F, U+2022, U+2026, U+2030, U+2039-203A, U+2044, U+2070, U+2074-2079, U+2080-2089, U+20A1, U+20A3-20A4, U+20A6-20A7, U+20A9, U+20AB-20AD, U+20B1-20B2, U+20B5, U+20B9-20BA, U+20BC-20BD, U+2116-2117, U+2122, U+212E, U+2153-2154, U+215B-215E, U+2190-2199, U+21A4, U+21A6, U+21A9-21AA, U+2212, U+2248, U+2260, U+2264-2265, U+27F5-27F6, U+FB01-FB02;
   }
 
+  :root{
+    /* ---- Circuit UI color tokens (light theme) ---- */
+    --cui-bg-normal:#fbfbf9;
+    --cui-bg-normal-hovered:#f1f0e9;
+    --cui-bg-normal-pressed:#e3e2d6;
+    --cui-bg-normal-disabled:rgba(251,251,249,0.4);
+    --cui-bg-subtle:#f5f4ed;
+    --cui-bg-subtle-hovered:#f0eee7;
+    --cui-bg-subtle-pressed:#e8e6dc;
+    --cui-bg-subtle-disabled:rgba(221,220,212,0.9);
+    --cui-bg-highlight:#e8e6dc;
+    --cui-bg-highlight-hovered:#d9d6c7;
+    --cui-bg-highlight-pressed:#d6d2c0;
+    --cui-bg-highlight-disabled:rgba(117,108,108,0.4);
+    --cui-bg-strong:#1e1c1c;
+    --cui-bg-strong-hovered:#3f3a3a;
+    --cui-bg-strong-pressed:#756c6c;
+    --cui-bg-strong-disabled:rgba(30,28,28,0.2);
+    --cui-bg-accent:#f5f4ed;
+    --cui-bg-accent-hovered:#e8e6dc;
+    --cui-bg-accent-pressed:#d9d6c7;
+    --cui-bg-accent-disabled:rgba(227,226,214,0.6);
+    --cui-bg-accent-strong:#1e1c1c;
+    --cui-bg-accent-strong-hovered:#332f2f;
+    --cui-bg-accent-strong-pressed:#4d4949;
+    --cui-bg-accent-strong-disabled:rgba(30,28,28,0.1);
+    --cui-bg-neutral:#f0eee7;
+    --cui-bg-neutral-hovered:#e8e6dc;
+    --cui-bg-neutral-pressed:#d9d6c7;
+    --cui-bg-neutral-disabled:rgba(217,214,199,0.3);
+    --cui-bg-neutral-strong:#c7c3b3;
+    --cui-bg-success:#dff4e2;
+    --cui-bg-success-hovered:#e2f6e5;
+    --cui-bg-success-pressed:#d6f2da;
+    --cui-bg-success-strong:#1e862d;
+    --cui-bg-success-strong-hovered:#23a235;
+    --cui-bg-warning:#feeed5;
+    --cui-bg-warning-hovered:#f6e3c6;
+    --cui-bg-warning-strong:#da7603;
+    --cui-bg-danger:#ffdacc;
+    --cui-bg-danger-hovered:#ffeae3;
+    --cui-bg-danger-pressed:#fdddd1;
+    --cui-bg-danger-strong:#d23f04;
+    --cui-bg-danger-strong-hovered:#cf3e05;
+    --cui-bg-danger-strong-pressed:#b63502;
+    --cui-bg-promo:#ffe4fd;
+    --cui-bg-promo-strong:#b342a9;
+    --cui-bg-brand:#ff61f2;
+    --cui-bg-brand-hovered:#eb58df;
+    --cui-bg-brand-pressed:#da4ece;
+    --cui-fg-normal:#1e1c1c;
+    --cui-fg-normal-hovered:rgba(30,28,28,0.9);
+    --cui-fg-normal-pressed:rgba(30,28,28,0.8);
+    --cui-fg-normal-disabled:rgba(30,28,28,0.5);
+    --cui-fg-subtle:#706464;
+    --cui-fg-subtle-hovered:rgba(112,100,100,0.9);
+    --cui-fg-subtle-pressed:rgba(112,100,100,0.8);
+    --cui-fg-subtle-disabled:rgba(112,100,100,0.5);
+    --cui-fg-placeholder:#76716b;
+    --cui-fg-on-strong:#fbfbf9;
+    --cui-fg-on-strong-hovered:rgba(251,251,249,0.9);
+    --cui-fg-on-strong-pressed:rgba(251,251,249,0.8);
+    --cui-fg-on-strong-subtle:rgba(251,251,249,0.7);
+    --cui-fg-accent:#1e1c1c;
+    --cui-fg-accent-hovered:#726767;
+    --cui-fg-accent-pressed:#887a7a;
+    --cui-fg-success:#3c7411;
+    --cui-fg-warning:#a65a03;
+    --cui-fg-danger:#b13606;
+    --cui-fg-danger-hovered:#d53d02;
+    --cui-fg-danger-pressed:#e94403;
+    --cui-fg-promo:#a33e9a;
+    --cui-fg-brand:#ff61f2;
+    --cui-border-normal:#d0cdc3;
+    --cui-border-normal-hovered:#ded7cf;
+    --cui-border-normal-pressed:#cac4be;
+    --cui-border-normal-disabled:rgba(207,206,194,0.5);
+    --cui-border-subtle:#e3e2d6;
+    --cui-border-subtle-hovered:#d0cdc3;
+    --cui-border-divider:#E7E6DF;
+    --cui-border-strong:#1e1c1c;
+    --cui-border-accent:#1e1c1c;
+    --cui-border-accent-hovered:#726767;
+    --cui-border-success:#3c7411;
+    --cui-border-warning:#a65a03;
+    --cui-border-danger:#b13606;
+    --cui-border-danger-hovered:#bf3802;
+    --cui-border-brand:#ff61f2;
+    --cui-bg-overlay:rgba(30,28,28,0.7);
+    --cui-bg-elevated:#fbfbf9;
+    --cui-border-focus:#1e1c1c;
+
+    /* ---- Circuit UI dimensions ---- */
+    --cui-border-radius-bit:4px;
+    --cui-border-radius-byte:10px;
+    --cui-border-radius-kilo:12px;
+    --cui-border-radius-mega:16px;
+    --cui-border-radius-giga:24px;
+    --cui-border-radius-circle:100%;
+    --cui-border-radius-pill:999999px;
+    --cui-border-width-kilo:1px;
+    --cui-border-width-mega:2px;
+    --cui-spacings-bit:4px;
+    --cui-spacings-byte:8px;
+    --cui-spacings-kilo:12px;
+    --cui-spacings-mega:16px;
+    --cui-spacings-giga:24px;
+    --cui-spacings-tera:32px;
+    --cui-spacings-peta:40px;
+    --cui-spacings-exa:48px;
+    --cui-spacings-zetta:56px;
+    --cui-transitions-default:120ms ease-in-out;
+    --cui-transitions-slow:300ms ease-in-out;
+
+    /* ---- Circuit UI typography ---- */
+    --cui-font-stack-default:"SumUp Narrow","SumUp Narrow fallback",Arial,system-ui,sans-serif,"Segoe UI",Roboto,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+    --cui-font-stack-display:"SumUp Black","SumUp Black fallback",Arial,system-ui,sans-serif,"Segoe UI",Roboto,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+    --cui-font-stack-mono:Menlo,Consolas,Monaco,"Liberation Mono","Lucida Console",monospace;
+    --cui-font-weight-regular:375;
+    --cui-font-weight-semibold:550;
+    --cui-font-weight-bold:650;
+    --cui-headline-l-font-size:2.0625rem;  --cui-headline-l-line-height:2.125rem;
+    --cui-headline-m-font-size:1.5625rem;  --cui-headline-m-line-height:1.625rem;
+    --cui-headline-s-font-size:1.1875rem;  --cui-headline-s-line-height:1.375rem;
+    --cui-body-l-font-size:1.3125rem;      --cui-body-l-line-height:1.625rem;
+    --cui-body-m-font-size:1.0625rem;      --cui-body-m-line-height:1.375rem;
+    --cui-body-s-font-size:0.9375rem;      --cui-body-s-line-height:1.25rem;
+    --cui-compact-l-font-size:1.125rem;    --cui-compact-l-line-height:1.5rem;
+    --cui-compact-m-font-size:1rem;        --cui-compact-m-line-height:1.125rem;
+    --cui-compact-s-font-size:0.875rem;    --cui-compact-s-line-height:1rem;
+    --cui-numeral-m-font-size:1.5625rem;   --cui-numeral-m-line-height:1.75rem;
+    --cui-numeral-s-font-size:1.0625rem;   --cui-numeral-s-line-height:1.5rem;
+
+    /* ---- Legacy app aliases → Circuit tokens (keeps every old rule on-system) ---- */
+    --cream:var(--cui-bg-normal);
+    --paper:var(--cui-bg-elevated);
+    --ink:var(--cui-fg-normal);
+    --ink-soft:var(--cui-fg-subtle);
+    --forest:var(--cui-bg-strong);
+    --forest-dark:var(--cui-bg-strong-hovered);
+    --coral:var(--cui-bg-strong);
+    --coral-dark:var(--cui-bg-strong-hovered);
+    --yolk:var(--cui-bg-highlight);
+    --line:var(--cui-border-subtle);
+    --sage:var(--cui-bg-subtle);
+    --step-minus:var(--cui-bg-neutral);
+    --danger:var(--cui-fg-danger);
+    --ok-green:var(--cui-fg-success);
+    --warn-yellow:var(--cui-fg-warning);
+    --radius:var(--cui-border-radius-mega);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--cui-bg-normal);
+    color:var(--cui-fg-normal);
+    font-family:var(--cui-font-stack-default);
+    font-weight:var(--cui-font-weight-regular);
+    font-size:var(--cui-body-m-font-size);
+    line-height:var(--cui-body-m-line-height);
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--cui-bg-highlight); color:var(--cui-fg-normal);}
+  button{font-family:var(--cui-font-stack-default);}
+  input,textarea{font-family:var(--cui-font-stack-default); font-weight:var(--cui-font-weight-regular);}
+  button:focus-visible, .table-btn:focus-visible{
+    outline:var(--cui-border-width-mega) solid var(--cui-border-focus);
+    outline-offset:var(--cui-border-width-mega);
+  }
+
+  
   /* ---------- Station select screen ---------- */
   .station-select{
     min-height:100vh;
@@ -46,24 +235,24 @@
   }
   .ss-header{ text-align:center; margin-bottom:8px; }
   .ss-header .mark{
-    font-family:'Montserrat Alternates',sans-serif;
-    font-weight:700;
-    font-size:20px;
-    color:var(--forest-dark);
+    font-family:var(--cui-font-stack-display);
+    font-weight:bold;
+    font-size:var(--cui-headline-m-font-size);
+    line-height:var(--cui-headline-m-line-height);
+    color:var(--cui-fg-normal);
   }
   .ss-header .sub{
-    font-family:'Space Mono',monospace;
-    font-size:11px;
-    color:var(--ink-soft);
-    text-transform:uppercase;
-    letter-spacing:1.5px;
+    font-size:var(--cui-compact-s-font-size);
+    line-height:var(--cui-compact-s-line-height);
+    font-weight:var(--cui-font-weight-semibold);
+    color:var(--cui-fg-subtle);
     margin-top:2px;
   }
   .ss-prompt{
-    font-family:'Inter',sans-serif;
-    font-weight:600;
-    font-size:15px;
-    color:var(--ink);
+    font-weight:var(--cui-font-weight-semibold);
+    font-size:var(--cui-body-s-font-size);
+    line-height:var(--cui-body-s-line-height);
+    color:var(--cui-fg-normal);
     margin:22px 0 18px;
   }
   .station-list{
@@ -73,65 +262,67 @@
     width:100%;
     max-width:420px;
   }
+  /* Circuit ListItem (navigation card) */
   .station-card{
     display:flex;
     align-items:center;
     gap:16px;
-    background:var(--paper);
-    border:1px solid var(--line);
-    border-radius:16px;
+    background:var(--cui-bg-elevated);
+    border:var(--cui-border-width-kilo) solid var(--cui-border-normal);
+    border-radius:var(--cui-border-radius-mega);
     padding:20px 18px;
     cursor:pointer;
     text-align:left;
-    transition:box-shadow .15s, transform .1s;
+    transition:box-shadow var(--cui-transitions-default), border-color var(--cui-transitions-default), transform .1s;
   }
-  .station-card:hover{ box-shadow:0 6px 18px rgba(47,74,61,.12); }
+  .station-card:hover{ border-color:var(--cui-border-accent-hovered); box-shadow:0 2px 8px rgba(30,28,28,.08); }
   .station-card:active{ transform:scale(.98); }
   .station-card .icon{ font-size:34px; line-height:1; flex-shrink:0; }
   .station-card .txt{ flex:1; }
   .station-card .name{
-    font-family:'Montserrat Alternates',sans-serif;
-    font-weight:600;
-    font-size:17px;
-    color:var(--ink);
+    font-weight:var(--cui-font-weight-semibold);
+    font-size:var(--cui-body-m-font-size);
+    line-height:var(--cui-body-m-line-height);
+    color:var(--cui-fg-normal);
   }
   .station-card .desc{
-    font-family:'Inter',sans-serif;
-    font-size:12.5px;
-    color:var(--ink-soft);
+    font-size:var(--cui-compact-s-font-size);
+    line-height:var(--cui-compact-s-line-height);
+    color:var(--cui-fg-subtle);
     margin-top:2px;
   }
   .station-card .pending-count{
-    font-family:'Space Mono',monospace;
-    font-weight:700;
-    font-size:13px;
-    background:var(--coral);
-    color:#fff;
+    font-weight:var(--cui-font-weight-semibold);
+    font-variant-numeric:tabular-nums;
+    font-size:var(--cui-compact-s-font-size);
+    background:var(--cui-bg-strong);
+    color:var(--cui-fg-on-strong);
     min-width:26px;
     height:26px;
     padding:0 6px;
-    border-radius:13px;
+    border-radius:var(--cui-border-radius-pill);
     display:flex; align-items:center; justify-content:center;
     flex-shrink:0;
   }
 
+  /* Circuit NotificationInline (warning) */
   .config-warning{
     max-width:420px;
-    background:#FFF6EF;
-    border:1px solid #F0D0B0;
-    border-radius:12px;
+    background:var(--cui-bg-warning);
+    border:var(--cui-border-width-kilo) solid var(--cui-border-warning);
+    border-radius:var(--cui-border-radius-byte);
     padding:16px 18px;
     margin-top:24px;
-    font-size:13px;
-    line-height:1.6;
-    color:var(--ink);
+    font-size:var(--cui-compact-s-font-size);
+    line-height:1.5;
+    color:var(--cui-fg-normal);
   }
-  .config-warning strong{ color:var(--coral-dark); }
+  .config-warning strong{ color:var(--cui-fg-warning); font-weight:var(--cui-font-weight-semibold); }
   .config-warning code{
-    background:#fff;
+    background:var(--cui-bg-normal);
     padding:1px 6px;
-    border-radius:5px;
-    font-family:'Space Mono',monospace;
+    border-radius:var(--cui-border-radius-bit);
+    font-family:var(--cui-font-stack-mono);
     font-size:12px;
   }
 
@@ -143,29 +334,31 @@
     justify-content:space-between;
     gap:12px;
     padding:10px 18px;
-    background:var(--paper);
-    border-bottom:1px solid var(--line);
+    background:var(--cui-bg-normal);
+    border-bottom:1px solid var(--cui-border-divider);
   }
   .kd-station-badge{ display:flex; align-items:center; gap:10px; }
   .kd-station-badge .icon{ font-size:24px; }
   .kd-station-badge .name{
-    font-family:'Montserrat Alternates',sans-serif;
-    font-weight:700;
-    font-size:17px;
-    color:var(--forest-dark);
+    font-weight:var(--cui-font-weight-bold);
+    font-size:var(--cui-headline-s-font-size);
+    line-height:var(--cui-headline-s-line-height);
+    color:var(--cui-fg-normal);
   }
+  /* Circuit Button secondary, size s */
   .switch-station-btn{
-    background:var(--sage);
-    border:1px solid var(--line);
-    color:var(--forest-dark);
-    padding:8px 14px;
-    border-radius:8px;
-    font-family:'Inter',sans-serif;
-    font-weight:600;
-    font-size:13px;
+    background:var(--cui-bg-normal);
+    border:var(--cui-border-width-kilo) solid var(--cui-border-normal);
+    color:var(--cui-fg-normal);
+    padding:calc(var(--cui-spacings-bit) - 1px) calc(var(--cui-spacings-kilo) - 1px);
+    border-radius:var(--cui-border-radius-byte);
+    font-weight:var(--cui-font-weight-semibold);
+    font-size:var(--cui-body-s-font-size);
+    line-height:var(--cui-body-s-line-height);
     cursor:pointer;
+    transition:background-color var(--cui-transitions-default), border-color var(--cui-transitions-default);
   }
-  .switch-station-btn:hover{ background:#CBDBC7; }
+  .switch-station-btn:hover{ background:var(--cui-bg-subtle-hovered); border-color:var(--cui-border-normal-hovered); }
 
   main.kd-main{
     padding:16px 16px 60px;
@@ -178,10 +371,11 @@
     gap:14px;
   }
 
+  /* Circuit Card with semantic status borders */
   .order-card{
-    background:var(--paper);
-    border:2px solid var(--line);
-    border-radius:16px;
+    background:var(--cui-bg-elevated);
+    border:var(--cui-border-width-mega) solid var(--cui-border-subtle);
+    border-radius:var(--cui-border-radius-mega);
     padding:16px 16px 14px;
     animation:card-in .25s ease;
   }
@@ -189,9 +383,9 @@
     from{ opacity:0; transform:translateY(8px); }
     to{ opacity:1; transform:translateY(0); }
   }
-  .order-card.age-fresh{ border-color:var(--ok-green); }
-  .order-card.age-warm{ border-color:var(--warn-yellow); }
-  .order-card.age-late{ border-color:var(--danger); }
+  .order-card.age-fresh{ border-color:var(--cui-border-success); }
+  .order-card.age-warm{ border-color:var(--cui-border-warning); }
+  .order-card.age-late{ border-color:var(--cui-border-danger); }
 
   .oc-top{
     display:flex;
@@ -199,95 +393,97 @@
     justify-content:space-between;
     margin-bottom:10px;
     padding-bottom:10px;
-    border-bottom:1px dashed var(--line);
+    border-bottom:1px solid var(--cui-border-divider);
   }
   .oc-table{
-    font-family:'Montserrat Alternates',sans-serif;
-    font-weight:700;
-    font-size:22px;
-    color:var(--ink);
+    font-family:var(--cui-font-stack-display);
+    font-weight:bold;
+    font-size:var(--cui-headline-s-font-size);
+    line-height:var(--cui-headline-s-line-height);
+    color:var(--cui-fg-normal);
   }
   .oc-table .lbl{
-    font-family:'Space Mono',monospace;
-    font-size:10px;
-    color:var(--ink-soft);
-    text-transform:uppercase;
-    letter-spacing:1px;
+    font-family:var(--cui-font-stack-default);
+    font-size:var(--cui-compact-s-font-size);
+    line-height:var(--cui-compact-s-line-height);
+    color:var(--cui-fg-subtle);
     display:block;
-    font-weight:400;
+    font-weight:var(--cui-font-weight-regular);
     margin-bottom:1px;
   }
+  /* Circuit Badge (status) */
   .oc-age{
-    font-family:'Space Mono',monospace;
-    font-weight:700;
-    font-size:13px;
+    font-weight:var(--cui-font-weight-semibold);
+    font-variant-numeric:tabular-nums;
+    font-size:var(--cui-compact-s-font-size);
+    line-height:var(--cui-compact-s-line-height);
     padding:4px 10px;
-    border-radius:999px;
+    border-radius:var(--cui-border-radius-byte);
     white-space:nowrap;
   }
-  .age-fresh .oc-age{ background:#E4F3E7; color:var(--ok-green); }
-  .age-warm .oc-age{ background:#FBF1DC; color:var(--warn-yellow); }
-  .age-late .oc-age{ background:#FBEAE6; color:var(--danger); }
+  .age-fresh .oc-age{ background:var(--cui-bg-success); color:var(--cui-fg-success); }
+  .age-warm .oc-age{ background:var(--cui-bg-warning); color:var(--cui-fg-warning); }
+  .age-late .oc-age{ background:var(--cui-bg-danger); color:var(--cui-fg-danger); }
 
   .oc-items{ display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
   .oc-item .qty{
-    font-family:'Space Mono',monospace;
-    font-weight:800;
-    font-size:16px;
-    color:var(--coral-dark);
+    font-weight:var(--cui-font-weight-bold);
+    font-variant-numeric:tabular-nums;
+    font-size:var(--cui-body-m-font-size);
+    color:var(--cui-fg-normal);
     margin-right:6px;
   }
   .oc-item .name{
-    font-weight:700;
-    font-size:16px;
-    color:var(--ink);
+    font-weight:var(--cui-font-weight-semibold);
+    font-size:var(--cui-body-m-font-size);
+    line-height:var(--cui-body-m-line-height);
+    color:var(--cui-fg-normal);
   }
   .oc-item .mods{
-    font-size:13px;
-    color:var(--ink-soft);
+    font-size:var(--cui-compact-s-font-size);
+    color:var(--cui-fg-subtle);
     margin:2px 0 0 24px;
-    line-height:1.4;
+    line-height:1.35;
   }
   .oc-item .note{
-    font-size:13px;
-    color:var(--coral-dark);
-    background:#FFF6EF;
-    border-radius:6px;
+    font-size:var(--cui-compact-s-font-size);
+    color:var(--cui-fg-warning);
+    background:var(--cui-bg-warning);
+    border-radius:var(--cui-border-radius-bit);
     padding:4px 8px;
     margin:4px 0 0 24px;
     display:inline-block;
   }
 
+  /* Circuit Button primary, size m */
   .oc-done-btn{
     width:100%;
-    background:var(--forest);
-    color:var(--cream);
-    border:none;
-    padding:13px;
-    border-radius:10px;
-    font-family:'Inter',sans-serif;
-    font-weight:700;
-    font-size:15px;
+    background:var(--cui-bg-strong);
+    color:var(--cui-fg-on-strong);
+    border:var(--cui-border-width-kilo) solid transparent;
+    padding:calc(var(--cui-spacings-kilo) - 1px) calc(var(--cui-spacings-giga) - 1px);
+    border-radius:var(--cui-border-radius-kilo);
+    font-weight:var(--cui-font-weight-semibold);
+    font-size:var(--cui-body-m-font-size);
+    line-height:var(--cui-body-m-line-height);
     cursor:pointer;
-    transition:background .15s;
+    transition:background-color var(--cui-transitions-default);
   }
-  .oc-done-btn:hover{ background:var(--forest-dark); }
-  .oc-done-btn:active{ transform:scale(.98); }
+  .oc-done-btn:hover{ background:var(--cui-bg-strong-hovered); }
+  .oc-done-btn:active{ background:var(--cui-bg-strong-pressed); transform:scale(.98); }
 
   .prep-summary{
-    background:#F1ECE0;
-    border:1px solid var(--line);
-    border-radius:12px;
+    background:var(--cui-bg-subtle);
+    border:var(--cui-border-width-kilo) solid var(--cui-border-subtle);
+    border-radius:var(--cui-border-radius-kilo);
     padding:12px 14px;
     margin-bottom:12px;
   }
   .prep-title{
-    font-family:'Montserrat Alternates',sans-serif;
-    font-weight:700;
-    font-size:11.5px;
-    text-transform:uppercase;
-    letter-spacing:.6px;
-    color:var(--forest);
+    font-weight:var(--cui-font-weight-semibold);
+    font-size:var(--cui-compact-s-font-size);
+    line-height:var(--cui-compact-s-line-height);
+    color:var(--cui-fg-subtle);
     margin-bottom:8px;
   }
   .prep-grid{
@@ -301,36 +497,36 @@
     align-items:baseline;
   }
   .prep-label{
-    font-family:'Inter',sans-serif;
-    font-size:13.5px;
-    color:var(--ink);
+    font-size:var(--cui-body-s-font-size);
+    line-height:var(--cui-body-s-line-height);
+    color:var(--cui-fg-normal);
   }
   .prep-value{
-    font-family:'Space Mono',monospace;
-    font-weight:700;
-    font-size:14px;
-    color:var(--forest-dark);
+    font-weight:var(--cui-font-weight-semibold);
+    font-variant-numeric:tabular-nums;
+    font-size:var(--cui-body-s-font-size);
+    color:var(--cui-fg-normal);
   }
   .prep-note{
-    font-family:'Inter',sans-serif;
-    font-size:11.5px;
-    color:var(--coral-dark);
+    font-size:var(--cui-compact-s-font-size);
+    line-height:var(--cui-compact-s-line-height);
+    color:var(--cui-fg-warning);
     margin-top:8px;
-    line-height:1.4;
   }
 
   .kd-empty{
     text-align:center;
     padding:80px 20px;
-    color:var(--ink-soft);
+    color:var(--cui-fg-subtle);
   }
   .kd-empty .big{ font-size:44px; display:block; margin-bottom:14px; }
-  .kd-empty .msg{ font-family:'Inter',sans-serif; font-size:15px; }
+  .kd-empty .msg{ font-size:var(--cui-body-s-font-size); }
 
   @media (max-width: 480px){
     .queue-grid{ grid-template-columns:1fr; }
-    .oc-table{ font-size:19px; }
+    .oc-table{ font-size:var(--cui-headline-s-font-size); }
   }
+
 </style>
 </head>
 <body>
