@@ -208,6 +208,7 @@
   *{box-sizing:border-box;}
   html,body{height:100%;}
   body{
+    overflow-anchor:none;
     margin:0;
     background:var(--cui-bg-normal);
     color:var(--cui-fg-normal);
@@ -307,14 +308,26 @@
     border-bottom:3px solid transparent;
     transition:color var(--cui-transitions-default), border-color var(--cui-transitions-default);
   }
+  .page-tab{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:var(--cui-spacings-byte);
+  }
+  .page-tab .cui-icon{ flex-shrink:0; }
   .page-tab:hover{ color:var(--cui-fg-normal-hovered); }
   .page-tab.active{
     color:var(--cui-fg-normal);
     border-bottom-color:var(--cui-border-accent);
   }
+  /* overflow-x:hidden would turn this into a scroll container (the
+     browser forces overflow-y to auto), which pushed the sticky filter
+     block down by an empty band the height of the tabs. clip doesn't. */
   .pages-clip{
     overflow-x:hidden;
-    overflow-y:visible;
+  }
+  @supports (overflow:clip){
+    .pages-clip{ overflow-x:clip; overflow-y:visible; }
   }
   .pages-track{
     display:flex;
@@ -389,8 +402,8 @@
     overflow-y:auto;
     display:flex;
     flex-wrap:wrap;
-    gap:var(--cui-spacings-byte);
-    padding:0 26px 10px;
+    gap:var(--cui-spacings-mega);
+    padding:var(--cui-spacings-byte) 26px var(--cui-spacings-kilo);
   }
   /* Circuit Tag (interactive) */
   .chat-tag{
@@ -432,9 +445,13 @@
     line-height:var(--cui-compact-s-line-height);
     font-weight:var(--cui-font-weight-semibold);
     color:var(--cui-fg-subtle);
-    margin-bottom:6px;
+    display:flex;
+    align-items:center;
+    gap:var(--cui-spacings-byte);
+    margin-bottom:var(--cui-spacings-kilo);
   }
-  .chat-tag-row{ display:flex; flex-wrap:wrap; gap:var(--cui-spacings-byte); }
+  .chat-tag-label .cui-icon{ flex-shrink:0; }
+  .chat-tag-row{ display:flex; flex-wrap:wrap; gap:var(--cui-spacings-kilo) var(--cui-spacings-mega); }
   .chat-tag.no-match{
     border-color:var(--cui-border-subtle);
     background:var(--cui-bg-normal);
@@ -510,24 +527,26 @@
   /* ---------- Filter pills + search ---------- */
   .sticky-controls{
     position:sticky;
-    top:var(--tabs-height, 44px);
+    top:0;
     z-index:30;
     background:var(--cui-bg-normal);
-    border-bottom:1px solid var(--cui-border-divider);
+    border-bottom:none;
     overflow:hidden;
     max-height:260px;
     opacity:1;
     transition:max-height .25s ease, opacity .2s ease, border-color .25s ease;
   }
+  @supports (overflow:clip){
+    .sticky-controls{ top:var(--tabs-height, 46px); }
+  }
   .sticky-controls.controls-hidden{
     max-height:0;
     opacity:0;
-    border-color:transparent;
   }
   .filter-bar{
-    padding:14px 26px 10px;
+    padding:var(--cui-spacings-mega) 26px var(--cui-spacings-kilo);
     display:flex;
-    gap:var(--cui-spacings-byte);
+    gap:var(--cui-spacings-kilo) var(--cui-spacings-mega);
     flex-wrap:wrap;
   }
   /* Circuit Tag — selected state = bg-strong */
@@ -1206,6 +1225,9 @@
     transition:opacity var(--cui-transitions-slow), transform var(--cui-transitions-slow);
     z-index:200;
     box-shadow:0 2px 12px rgba(30,28,28,.16);
+    width:max-content;
+    max-width:calc(100vw - 32px);
+    text-align:center;
   }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 
@@ -1352,11 +1374,11 @@
   .cart-toggle{ display:none; }
   @media (max-width: 980px){
     .app{ grid-template-columns:1fr; }
-    .filter-bar{ padding:12px 14px 8px; }
-    .search-row{ padding:0 14px 12px; }
+    .filter-bar{ padding:var(--cui-spacings-kilo) var(--cui-spacings-mega) var(--cui-spacings-kilo); }
+    .search-row{ padding:0 var(--cui-spacings-mega) var(--cui-spacings-kilo); }
     .page-tab{ font-size:var(--cui-compact-s-font-size); padding:11px 8px; }
     .chat-log{ padding:16px 14px 12px; }
-    .chat-suggestions{ padding:0 14px 10px; }
+    .chat-suggestions{ padding:var(--cui-spacings-byte) var(--cui-spacings-mega) var(--cui-spacings-kilo); }
     .chat-input-row{ padding:10px 14px; }
     aside.ticket{
       position:fixed;
@@ -1455,9 +1477,9 @@
 <div class="app">
   <div class="pages-viewport" id="pagesViewport">
     <div class="page-tabs">
-      <button class="page-tab active" data-page="food">🍽️ Food</button>
-      <button class="page-tab" data-page="drinks">🥤 Drinks</button>
-      <button class="page-tab" data-page="chat">💬 Chat</button>
+      <button class="page-tab active" data-page="food"><svg class="cui-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12.833 3a1 1 0 1 0-2 0v3a1 1 0 1 0 2 0V3Zm7 6c1.105 0 2.02.904 1.801 1.987a9.998 9.998 0 0 1-13.627 7.252 10 10 0 0 1-5.974-7.252C1.813 9.904 2.729 9 3.833 9h16Zm-15 13a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2h-12a1 1 0 0 1-1-1Zm3-20a1 1 0 0 1 1 1v3a1 1 0 0 1-2 0V3a1 1 0 0 1 1-1Zm9 1a1 1 0 1 0-2 0v3a1 1 0 1 0 2 0V3Z" fill="currentColor"/></svg><span>Food</span></button>
+      <button class="page-tab" data-page="drinks"><svg class="cui-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path fill="currentColor" d="M20 11.947a2.58 2.58 0 0 0-2.474-2.574v5.147a2.58 2.58 0 0 0 1.72-.75A2.58 2.58 0 0 0 20 11.947M5.685 4.79V3a1 1 0 0 1 2 0v1.79a1 1 0 0 1-2 0m3.578 0V3a1 1 0 0 1 2 0v1.79a1 1 0 1 1-2 0m3.579 0V3a1 1 0 0 1 2 0v1.79a1 1 0 1 1-2 0M5 16.421A2.58 2.58 0 0 0 7.58 19h5.367a2.58 2.58 0 0 0 2.58-2.58V9.369H5zm17-4.474a4.58 4.58 0 0 1-4.477 4.576A4.58 4.58 0 0 1 12.947 21H7.58A4.58 4.58 0 0 1 3 16.42V9.264c0-.502.2-.984.555-1.34l.14-.125c.336-.276.76-.43 1.2-.43H17.42A4.58 4.58 0 0 1 22 11.948"/></svg><span>Drinks</span></button>
+      <button class="page-tab" data-page="chat"><svg class="cui-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path fill="currentColor" d="M6.188 3.863A10 10 0 1 1 7.83 21.088a.8.8 0 0 0-.41-.04l-3.008.882-.024.007a1.9 1.9 0 0 1-2.349-2.22l.028-.107.938-2.9a.8.8 0 0 0-.038-.424 10 10 0 0 1 3.22-12.423m6.447.162a8 8 0 0 0-7.988 11.127l.146.322.03.065a2.8 2.8 0 0 1 .131 1.634 1 1 0 0 1-.025.093l-.87 2.682 2.863-.836.086-.021c.45-.09.915-.067 1.353.065l.186.064.068.028a8 8 0 1 0 4.02-15.223M8.409 11a1 1 0 0 1 0 2H8.4a1 1 0 0 1 0-2zm3.6 0a1 1 0 1 1 0 2H12a1 1 0 0 1 0-2zm3.6 0a1 1 0 1 1 0 2h-.01a1 1 0 0 1 0-2z"/></svg><span>Chat</span></button>
     </div>
     <div class="pages-clip" id="pagesClip">
       <div class="pages-track" id="pagesTrack">
@@ -1493,9 +1515,7 @@
       <form class="chat-input-row" id="chatInputForm">
         <input type="text" id="chatInput" placeholder="e.g. 2 eggo · sunny stack gluten free · conqueror without mozzarella" autocomplete="off">
         <button type="submit" class="chat-send-btn" aria-label="Send">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
+          <svg class="cui-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path fill="currentColor" d="M19.111 3.081a1.42 1.42 0 0 1 1.32.203l.153.132.132.152q.12.163.192.351l.058.193.03.2a1.4 1.4 0 0 1-.077.576h.002l-5.524 16.148v.001a1.425 1.425 0 0 1-2.67.069h-.001l-2.703-6.74-.065-.126a.7.7 0 0 0-.323-.263h-.001l-6.74-2.703A1.42 1.42 0 0 1 2 9.914l.008-.108a1.43 1.43 0 0 1 .955-1.203l16.148-5.525zm-7.26 10.48q.015.028.028.057v.002l2.127 5.304L17.913 7.5zM5.076 9.993l5.304 2.127h-.001q.03.013.059.027l6.062-6.061z"/></svg>
         </button>
       </form>
       </div>
@@ -2271,8 +2291,15 @@ function stationForItemName(name){
   return null;
 }
 
+// Returns a Promise that resolves once Firebase has confirmed every
+// station write, and rejects with the real reason (e.g. the database
+// rules refusing the write) — so the waiter is never told "sent" when
+// the kitchen didn't actually get it.
 function broadcastOrderToKitchen(tableId, guests, lines){
-  if(!kitchenDb) return;
+  if(!kitchenDb){
+    return Promise.reject(new Error("Kitchen connection didn't load (no internet, or Firebase blocked)."));
+  }
+  const writes = [];
   const buckets = {pancakeBowlSmoothie:[], hotFoodEggsSalad:[], drinks:[]};
   lines.forEach(line=>{
     const station = stationForItemName(line.name);
@@ -2286,14 +2313,18 @@ function broadcastOrderToKitchen(tableId, guests, lines){
   });
   Object.keys(buckets).forEach(station=>{
     if(buckets[station].length === 0) return;
-    kitchenDb.ref("stationOrders/"+station).push({
+    writes.push(kitchenDb.ref("stationOrders/"+station).push({
       table: tableId,
       guests: guests || "",
       createdAt: Date.now(),
       status: "pending",
       items: buckets[station]
-    });
+    }));
   });
+  if(writes.length === 0){
+    return Promise.reject(new Error("None of these items is assigned to a kitchen station."));
+  }
+  return Promise.all(writes);
 }
 
 function attachCardHandlers(container){
@@ -2408,6 +2439,26 @@ function totalAllUnits(){
   return pendingUnits.reduce((s,u)=>s+unitPrice(u),0);
 }
 
+// Minus at quantity 1 = zero: an item that's already on the ticket
+// (opened from its chat message) is removed from the order; a new item
+// simply isn't added and the sheet closes.
+function removeFromSheetAtZero(){
+  const edited = editingLine;
+  const name = pendingItem ? pendingItem.name : "";
+  if(edited){
+    const idx = order.findIndex(l=>l.uid===edited.uid);
+    if(idx > -1) order.splice(idx, 1);
+    closeSheetAnimated();
+    renderTicket();
+    if(typeof refreshCardSteppers === "function") refreshCardSteppers();
+    showToast(edited.sentQty > 0
+      ? `${name} removed — it was already sent, tell the kitchen`
+      : `${name} removed from the order`, edited.sentQty > 0 ? 5000 : 2400);
+  } else {
+    closeSheetAnimated();
+  }
+}
+
 function setQty(newQty){
   newQty = Math.max(1, newQty);
   if(newQty > pendingQty){
@@ -2476,7 +2527,7 @@ function renderModal(){
     <div class="modal-qty-row">
       <span class="qty-label">How many ${it.name} for this table?</span>
       <div class="qty-group">
-        <button class="qty-btn" id="modalQtyMinus" ${pendingQty<=1?"disabled":""}>−</button>
+        <button class="qty-btn" id="modalQtyMinus" aria-label="${pendingQty<=1 ? (editingLine ? "Remove from order" : "Don't add") : "One less"}">−</button>
         <span class="qty-val" id="modalQtyVal">${pendingQty}</span>
         <button class="qty-btn" id="modalQtyPlus">+</button>
       </div>
@@ -2488,7 +2539,10 @@ function renderModal(){
     </div>
   `;
 
-  document.getElementById("modalQtyMinus").addEventListener("click", ()=> setQty(pendingQty-1));
+  document.getElementById("modalQtyMinus").addEventListener("click", ()=>{
+    if(pendingQty > 1){ setQty(pendingQty-1); return; }
+    removeFromSheetAtZero();
+  });
   document.getElementById("modalQtyPlus").addEventListener("click", ()=> setQty(pendingQty+1));
 
   modalBody.querySelectorAll(".opt-row").forEach(row=>{
@@ -2535,7 +2589,7 @@ function renderModal(){
     });
   });
 
-  document.getElementById("modalCancel").addEventListener("click", closeModal);
+  document.getElementById("modalCancel").addEventListener("click", closeSheetAnimated);
   document.getElementById("modalConfirm").addEventListener("click", confirmAddToOrder);
 }
 
@@ -2561,7 +2615,64 @@ function confirmAddToOrder(){
   showToast(edited ? `${item.name} updated` : `${qty>1 ? qty+"× " : ""}${item.name} added to ticket`);
 }
 
-overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(); });
+overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeSheetAnimated(); });
+
+/* Bottom sheet: slide it down (and fade the backdrop) before closing,
+   and let the waiter drag it down with a finger to dismiss — from the
+   handle/top area, or anywhere once the sheet is scrolled to the top. */
+function closeSheetAnimated(){
+  if(!overlay.classList.contains("open")) return;
+  modalBody.style.transition = "transform var(--cui-transitions-slow)";
+  modalBody.style.transform = "translateY(100%)";
+  overlay.style.transition = "background-color var(--cui-transitions-slow)";
+  overlay.style.backgroundColor = "transparent";
+  setTimeout(()=>{
+    closeModal();
+    modalBody.style.transition = modalBody.style.transform = "";
+    overlay.style.transition = overlay.style.backgroundColor = "";
+  }, 300);
+}
+(function enableSheetSwipe(){
+  let startY = 0, lastY = 0, lastT = 0, velocity = 0, dragging = false, armed = false;
+  modalBody.addEventListener("touchstart", (e)=>{
+    if(e.touches.length !== 1) return;
+    armed = modalBody.scrollTop <= 0;
+    dragging = false;
+    startY = lastY = e.touches[0].clientY;
+    lastT = performance.now();
+    velocity = 0;
+  }, {passive:true});
+  modalBody.addEventListener("touchmove", (e)=>{
+    if(!armed) return;
+    const y = e.touches[0].clientY;
+    const dy = y - startY;
+    if(!dragging){
+      if(dy > 6) dragging = true;          // pulling down → start drag
+      else if(dy < -6){ armed = false; return; } // scrolling up → normal scroll
+      else return;
+    }
+    e.preventDefault();                      // stop the page/sheet scrolling while dragging
+    const now = performance.now();
+    velocity = (y - lastY) / Math.max(1, now - lastT);
+    lastY = y; lastT = now;
+    modalBody.style.transition = "none";
+    modalBody.style.transform = `translateY(${Math.max(0, dy)}px)`;
+    const fade = Math.max(0, 1 - dy / (modalBody.offsetHeight || 1));
+    overlay.style.backgroundColor = `rgba(30,28,28,${0.7 * fade})`;
+  }, {passive:false});
+  modalBody.addEventListener("touchend", ()=>{
+    if(!dragging){ armed = false; return; }
+    const dy = lastY - startY;
+    dragging = armed = false;
+    if(dy > 110 || velocity > 0.6){
+      closeSheetAnimated();
+    } else {
+      modalBody.style.transition = "transform var(--cui-transitions-slow)";
+      modalBody.style.transform = "translateY(0)";
+      overlay.style.backgroundColor = "";
+    }
+  });
+})();
 
 /* ---------------------------------------------------------------
    TICKET / ORDER PANEL
@@ -2638,7 +2749,7 @@ function renderChatLog(){
   const chatLog = document.getElementById("chatLog");
   if(!chatLog) return;
   if(order.length === 0){
-    chatLog.innerHTML = `<div class="chat-empty">Type a dish or drink below to start this table's order.<br>Tap a suggestion to add it, then tap the item here to customize.</div>`;
+    chatLog.innerHTML = `<div class="chat-empty">Type a dish or drink</div>`;
     return;
   }
   chatLog.innerHTML = order.map(line=>{
@@ -2824,7 +2935,9 @@ function renderChatSuggestions(text){
   const tagBtn = it => `<button type="button" class="chat-tag" data-name="${escapeAttr(it.name)}">${it.name}</button>`;
   const group = (label, list) => list.length
     ? `<div class="chat-tag-group"><div class="chat-tag-label">${label}</div><div class="chat-tag-row">${list.map(tagBtn).join("")}</div></div>` : "";
-  box.innerHTML = preview + group("🍽️ Food", foodTags) + group("🥤 Drinks", drinkTags);
+  const ICON_FOOD = '<svg class="cui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12.833 3a1 1 0 1 0-2 0v3a1 1 0 1 0 2 0V3Zm7 6c1.105 0 2.02.904 1.801 1.987a9.998 9.998 0 0 1-13.627 7.252 10 10 0 0 1-5.974-7.252C1.813 9.904 2.729 9 3.833 9h16Zm-15 13a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2h-12a1 1 0 0 1-1-1Zm3-20a1 1 0 0 1 1 1v3a1 1 0 0 1-2 0V3a1 1 0 0 1 1-1Zm9 1a1 1 0 1 0-2 0v3a1 1 0 1 0 2 0V3Z" fill="currentColor"/></svg>';
+  const ICON_DRINKS = '<svg class="cui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path fill="currentColor" d="M20 11.947a2.58 2.58 0 0 0-2.474-2.574v5.147a2.58 2.58 0 0 0 1.72-.75A2.58 2.58 0 0 0 20 11.947M5.685 4.79V3a1 1 0 0 1 2 0v1.79a1 1 0 0 1-2 0m3.578 0V3a1 1 0 0 1 2 0v1.79a1 1 0 1 1-2 0m3.579 0V3a1 1 0 0 1 2 0v1.79a1 1 0 1 1-2 0M5 16.421A2.58 2.58 0 0 0 7.58 19h5.367a2.58 2.58 0 0 0 2.58-2.58V9.369H5zm17-4.474a4.58 4.58 0 0 1-4.477 4.576A4.58 4.58 0 0 1 12.947 21H7.58A4.58 4.58 0 0 1 3 16.42V9.264c0-.502.2-.984.555-1.34l.14-.125c.336-.276.76-.43 1.2-.43H17.42A4.58 4.58 0 0 1 22 11.948"/></svg>';
+  box.innerHTML = preview + group(ICON_FOOD + "<span>Food</span>", foodTags) + group(ICON_DRINKS + "<span>Drinks</span>", drinkTags);
   box.querySelectorAll(".chat-tag:not(.no-match)").forEach(tag=>{
     tag.addEventListener("click", ()=>{
       const item = findItemByName(tag.dataset.name);
@@ -2913,15 +3026,37 @@ sendBtn.addEventListener("click", ()=>{
   }
 
   const sentTable = currentTable;
+  const tableLines = order;               // this table's live line array
   const guests = (tableMeta[currentTable] && tableMeta[currentTable].guests) || "";
-  broadcastOrderToKitchen(sentTable, guests, linesToSend);
+  const prevSent = new Map(tableLines.map(l=>[l, l.sentQty]));
 
   // The order STAYS in the ticket (not cleared) so the waiter can
   // still see everything that's been ordered for this table, sent or
   // not — only the "sent" marker moves forward.
-  order.forEach(line=>{ line.sentQty = line.qty; });
+  tableLines.forEach(line=>{ line.sentQty = line.qty; });
 
-  showToast(`Sent to kitchen for Table ${sentTable} — ${fmt(newItemsPrice)}`);
+  let settled = false;
+  const slowTimer = setTimeout(()=>{
+    if(!settled) showToast(`⏳ Table ${sentTable}: still waiting for the kitchen to confirm — check this phone's internet.`, 6000);
+  }, 6000);
+
+  broadcastOrderToKitchen(sentTable, guests, linesToSend)
+    .then(()=>{
+      settled = true; clearTimeout(slowTimer);
+      showToast(`✓ Kitchen received Table ${sentTable} — ${fmt(newItemsPrice)}`);
+    })
+    .catch(err=>{
+      settled = true; clearTimeout(slowTimer);
+      // Undo the "sent" marks so the waiter can simply press Send again.
+      tableLines.forEach(line=>{ if(prevSent.has(line)) line.sentQty = prevSent.get(line); });
+      if(typeof renderTableGrid === "function") renderTableGrid();
+      renderTicket();
+      const msg = String(err && (err.code || err.message) || err);
+      const hint = /permission/i.test(msg) ? " — Firebase rules are blocking writes." : "";
+      showToast(`⚠️ NOT sent to kitchen (Table ${sentTable}): ${msg}${hint}`, 9000);
+      console.error("Kitchen send failed:", err);
+    });
+
   renderTicket();
   goToTableSelect();
 });
@@ -2988,21 +3123,34 @@ function syncTabsHeight(){
 }
 syncTabsHeight();
 window.addEventListener("resize", syncTabsHeight);
+if(window.ResizeObserver){
+  new ResizeObserver(syncTabsHeight).observe(document.querySelector(".page-tabs"));
+}
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(syncTabsHeight);
 
 // Hide the filter pills + search bar while scrolling down (to give the
 // menu more room), and bring them back the moment the person scrolls
 // up even slightly — a small threshold avoids it flickering on tiny
 // scroll jitters, and it always reappears near the very top.
+// Collapsing/expanding the block itself moves the page content, which
+// fires extra scroll events — those are ignored for the length of the
+// animation so the bar can't flicker open/closed on its own.
 let lastScrollY = window.scrollY;
+let controlsLockUntil = 0;
 window.addEventListener("scroll", ()=>{
   const y = window.scrollY;
+  const now = performance.now();
+  if(now < controlsLockUntil){ lastScrollY = y; return; }
   const goingDown = y > lastScrollY;
   const delta = Math.abs(y - lastScrollY);
   const controls = document.querySelectorAll(".sticky-controls");
-  if(y < 30){
-    controls.forEach(el=> el.classList.remove("controls-hidden"));
-  } else if(delta > 4){
-    controls.forEach(el=> el.classList.toggle("controls-hidden", goingDown));
+  const wasHidden = controls.length && controls[0].classList.contains("controls-hidden");
+  let hide = wasHidden;
+  if(y < 30) hide = false;
+  else if(delta > 4) hide = goingDown;
+  if(hide !== wasHidden){
+    controls.forEach(el=> el.classList.toggle("controls-hidden", hide));
+    controlsLockUntil = now + 350;
   }
   lastScrollY = y;
 }, {passive:true});
@@ -3081,12 +3229,12 @@ pagesViewport.addEventListener("touchend", (e)=>{
    TOAST
 --------------------------------------------------------------- */
 let toastTimer;
-function showToast(msg){
+function showToast(msg, ms){
   const toast = document.getElementById("toast");
   toast.textContent = msg;
   toast.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=> toast.classList.remove("show"), 2400);
+  toastTimer = setTimeout(()=> toast.classList.remove("show"), ms || 2400);
 }
 
 /* ---------------------------------------------------------------
