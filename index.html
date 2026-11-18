@@ -405,6 +405,16 @@
     gap:var(--cui-spacings-mega);
     padding:var(--cui-spacings-byte) 26px var(--cui-spacings-kilo);
   }
+  /* Soft fade where a scrolling area is cut off, instead of slicing
+     tags/bubbles in half. Classes are set from JS by scroll position. */
+  .chat-suggestions, .chat-log{
+    --fade-top:0px;
+    --fade-bottom:0px;
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+            mask-image:linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+  }
+  .fade-top{ --fade-top:var(--cui-spacings-tera); }
+  .fade-bottom{ --fade-bottom:var(--cui-spacings-giga); }
   /* Circuit Tag (interactive) */
   .chat-tag{
     border:var(--cui-border-width-kilo) solid var(--cui-border-normal);
@@ -2965,6 +2975,21 @@ function handleChatSubmit(){
   addParsedLine(item, p);
   finishChatEntry();
 }
+
+// Toggle the edge fades depending on whether there is more content
+// hidden above / below.
+function updateScrollFades(el){
+  if(!el) return;
+  const canScroll = el.scrollHeight > el.clientHeight + 1;
+  el.classList.toggle("fade-top", canScroll && el.scrollTop > 2);
+  el.classList.toggle("fade-bottom", canScroll && el.scrollTop + el.clientHeight < el.scrollHeight - 2);
+}
+["chatSuggestions","chatLog"].forEach(id=>{
+  const el = document.getElementById(id);
+  el.addEventListener("scroll", ()=> updateScrollFades(el), {passive:true});
+  new MutationObserver(()=> requestAnimationFrame(()=> updateScrollFades(el))).observe(el, {childList:true, subtree:true});
+  if(window.ResizeObserver) new ResizeObserver(()=> updateScrollFades(el)).observe(el);
+});
 
 document.getElementById("chatInput").addEventListener("input", (e)=>{
   renderChatSuggestions(e.target.value);
