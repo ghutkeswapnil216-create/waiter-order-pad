@@ -519,6 +519,40 @@
   .oc-toggle:hover{ color:var(--cui-fg-normal); }
   .oc-toggle[aria-expanded="false"]{ margin-bottom:0; }
   .oc-details[hidden]{ display:none; }
+  .kd-toolbar{
+    display:flex;
+    justify-content:flex-end;
+    margin:0 0 var(--cui-spacings-byte);
+  }
+  .kd-toolbar[hidden]{ display:none; }
+  .kd-toolbar .kd-toggle-all{
+    width:auto;
+    border-top:none;
+    margin:0;
+    padding:var(--cui-spacings-bit) 0;
+  }
+  /* Grand total card: full width under the last order, Circuit strong card */
+  .grand-total{
+    grid-column:1 / -1;
+    margin-top:var(--cui-spacings-byte);
+    padding-top:var(--cui-spacings-mega);
+    border-top:var(--cui-border-width-mega) solid var(--cui-border-strong);
+  }
+  .prep-summary.prep-grand{
+    margin:0;
+    background:var(--cui-bg-strong);
+    border-color:var(--cui-bg-strong);
+    padding:var(--cui-spacings-mega);
+  }
+  .prep-grand .prep-title{
+    color:var(--cui-fg-on-strong);
+    font-size:var(--cui-body-m-font-size);
+    line-height:var(--cui-body-m-line-height);
+    margin-bottom:var(--cui-spacings-kilo);
+  }
+  .prep-grand .prep-label{ color:var(--cui-fg-on-strong-subtle); }
+  .prep-grand .prep-value{ color:var(--cui-fg-on-strong); }
+  .prep-grand .prep-note{ color:var(--cui-bg-warning); }
   .oc-done-btn:hover{ background:var(--cui-bg-strong-hovered); }
   .oc-done-btn:active{ background:var(--cui-bg-strong-pressed); transform:scale(.98); }
 
@@ -637,6 +671,9 @@
     </div>
   </header>
   <main class="kd-main">
+    <div class="kd-toolbar" id="kdToolbar" hidden>
+      <button class="oc-toggle kd-toggle-all" id="toggleAllBtn"></button>
+    </div>
     <div class="queue-grid" id="queueGrid"></div>
   </main>
 </div>
@@ -758,7 +795,7 @@ const ICON_CHECK = '<svg class="cui-icon" width="20" height="20" viewBox="0 0 24
 const ICON_CHEVRON_DOWN = '<svg class="cui-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path fill="currentColor" d="M11.528 6.528a.667.667 0 0 1 .944.944l-4 4a.667.667 0 0 1-.944 0l-4-4a.667.667 0 0 1 .944-.944L8 10.057z"/></svg>';
 const ICON_CHEVRON_UP = '<svg class="cui-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path fill="currentColor" d="M7.633 5.443a.67.67 0 0 1 .839.085l4 4a.667.667 0 0 1-.944.944L8 6.943l-3.528 3.529a.667.667 0 0 1-.944-.944l4-4z"/></svg>';
 
-function prepSummaryHTML(items){
+function prepSummaryHTML(items, title, extraClass){
   const t = computePrepSummary(items);
   const rows = [
     ["Plates", t.plate, ""],
@@ -772,8 +809,8 @@ function prepSummaryHTML(items){
   if(rows.length === 0) return "";
 
   return `
-    <div class="prep-summary">
-      <div class="prep-title">${ICON_LIST}<span>Prep summary</span></div>
+    <div class="prep-summary ${extraClass || ""}">
+      <div class="prep-title">${ICON_LIST}<span>${title || "Prep summary"}</span></div>
       <div class="prep-grid">
         ${rows.map(([label,val,suffix])=>`
           <div class="prep-row">
@@ -933,25 +970,61 @@ function setQueueHTML(html){
 /* Collapse/expand a card's prep summary + "Mark prepared" button.
    Remembered per order on this phone, so live updates and the
    background check never re-open a card the cook folded away. */
-let collapsedCards = new Set();
-try{ collapsedCards = new Set(JSON.parse(localStorage.getItem("kdsCollapsed") || "[]")); }catch(e){}
+// Global default (set by the "all" button above the queue) + per-card
+// exceptions the cook toggled individually. New orders follow the
+// global default, so with "Hide all" on, new tickets arrive folded.
+let collapseAll = false;
+let cardExceptions = new Set();
+try{
+  collapseAll = localStorage.getItem("kdsCollapseAll") === "1";
+  cardExceptions = new Set(JSON.parse(localStorage.getItem("kdsCardExceptions") || "[]"));
+}catch(e){}
+function isCollapsed(key){ return collapseAll !== cardExceptions.has(key); }
 function saveCollapsed(){
   // keep only orders that still exist, so the list never grows forever
   const live = Object.keys(ordersCache || {});
-  collapsedCards = new Set([...collapsedCards].filter(k => live.includes(k)));
-  try{ localStorage.setItem("kdsCollapsed", JSON.stringify([...collapsedCards])); }catch(e){}
+  cardExceptions = new Set([...cardExceptions].filter(k => live.includes(k)));
+  try{
+    localStorage.setItem("kdsCollapseAll", collapseAll ? "1" : "0");
+    localStorage.setItem("kdsCardExceptions", JSON.stringify([...cardExceptions]));
+  }catch(e){}
 }
 function toggleCard(key){
-  if(collapsedCards.has(key)) collapsedCards.delete(key);
-  else collapsedCards.add(key);
+  if(cardExceptions.has(key)) cardExceptions.delete(key);
+  else cardExceptions.add(key);
   saveCollapsed();
   renderQueue();
 }
+function toggleAllCards(){
+  const keys = pendingEntries().map(([k])=>k);
+  const anyOpen = keys.some(k => !isCollapsed(k));
+  collapseAll = anyOpen;          // something open → hide all; all hidden → show all
+  cardExceptions = new Set();
+  saveCollapsed();
+  renderQueue();
+}
+document.getElementById("toggleAllBtn").addEventListener("click", toggleAllCards);
+function pendingEntries(){
+  return Object.entries(ordersCache || {})
+    .filter(([key, o]) => o.status === "pending")
+    .sort((a,b)=> a[1].createdAt - b[1].createdAt);
+}
+function renderToolbar(entries){
+  const bar = document.getElementById("kdToolbar");
+  const btn = document.getElementById("toggleAllBtn");
+  if(entries.length === 0){ bar.hidden = true; return; }
+  bar.hidden = false;
+  const anyOpen = entries.some(([k]) => !isCollapsed(k));
+  const html = anyOpen
+    ? ICON_CHEVRON_UP + "<span>Hide all prep & done</span>"
+    : ICON_CHEVRON_DOWN + "<span>Show all prep & done</span>";
+  if(btn.innerHTML !== html) btn.innerHTML = html;
+  btn.setAttribute("aria-expanded", anyOpen ? "true" : "false");
+}
 
 function renderQueue(){
-  const entries = Object.entries(ordersCache)
-    .filter(([key, o]) => o.status === "pending")
-    .sort((a,b)=> a[1].createdAt - b[1].createdAt); // oldest first — FIFO for the kitchen
+  const entries = pendingEntries(); // oldest first — FIFO for the kitchen
+  renderToolbar(entries);
 
   if(entries.length === 0){
     renderEmpty("All caught up — no pending orders for this station.");
@@ -984,16 +1057,16 @@ function renderQueue(){
           <div class="oc-age">${ageLabel(o.createdAt)}</div>
         </div>
         <div class="oc-items">${itemsHtml}</div>
-        <button class="oc-toggle" data-key="${key}" aria-expanded="${collapsedCards.has(key) ? "false" : "true"}">
-          ${collapsedCards.has(key) ? ICON_CHEVRON_DOWN + "<span>Show prep & done</span>" : ICON_CHEVRON_UP + "<span>Hide prep & done</span>"}
+        <button class="oc-toggle" data-key="${key}" aria-expanded="${isCollapsed(key) ? "false" : "true"}">
+          ${isCollapsed(key) ? ICON_CHEVRON_DOWN + "<span>Show prep & done</span>" : ICON_CHEVRON_UP + "<span>Hide prep & done</span>"}
         </button>
-        <div class="oc-details"${collapsedCards.has(key) ? " hidden" : ""}>
+        <div class="oc-details"${isCollapsed(key) ? " hidden" : ""}>
           ${prepSummaryHTML(o.items)}
           <button class="oc-done-btn" data-key="${key}">${ICON_CHECK}<span>Mark prepared</span></button>
         </div>
       </div>
     `;
-  }).join("");
+  }).join("") + grandTotalHTML(entries);
 
   // A card counts as "new" (slide-in animation) only on the render where
   // it first appears — later re-renders keep it still.
@@ -1004,6 +1077,16 @@ function renderQueue(){
   if(/ is-new/.test(html)){
     setTimeout(()=> renderQueue(), 400);
   }
+}
+
+/* Grand total of everything still to prep at this station, across all
+   pending tables — shown after the last order card. */
+function grandTotalHTML(entries){
+  const allItems = entries.flatMap(([, o]) => o.items || []);
+  const tables = entries.length;
+  const inner = prepSummaryHTML(allItems, `All tables — total prep (${tables} ${tables === 1 ? "order" : "orders"})`, "prep-grand");
+  if(!inner) return "";
+  return `<div class="grand-total">${inner}</div>`;
 }
 
 function markDone(key){
