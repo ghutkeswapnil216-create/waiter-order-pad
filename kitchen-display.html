@@ -553,6 +553,24 @@
   .prep-grand .prep-label{ color:var(--cui-fg-on-strong-subtle); }
   .prep-grand .prep-value{ color:var(--cui-fg-on-strong); }
   .prep-grand .prep-note{ color:var(--cui-bg-warning); }
+  .prep-grand .grand-sum{
+    margin-top:var(--cui-spacings-bit);
+    padding-top:var(--cui-spacings-byte);
+    border-top:1px solid rgba(251,251,249,.2);
+  }
+  /* Ingredient block nested inside the dark card */
+  .prep-summary.prep-grand-sub{
+    margin:var(--cui-spacings-mega) 0 0;
+    padding:var(--cui-spacings-mega) 0 0;
+    background:none;
+    border:none;
+    border-top:1px solid rgba(251,251,249,.2);
+    border-radius:0;
+  }
+  .prep-grand-sub .prep-title{ color:var(--cui-fg-on-strong-subtle); font-size:var(--cui-compact-s-font-size); margin-bottom:var(--cui-spacings-byte); }
+  .prep-grand-sub .prep-label{ color:var(--cui-fg-on-strong-subtle); }
+  .prep-grand-sub .prep-value{ color:var(--cui-fg-on-strong); }
+  .prep-grand-sub .prep-note{ color:var(--cui-bg-warning); }
   .oc-done-btn:hover{ background:var(--cui-bg-strong-hovered); }
   .oc-done-btn:active{ background:var(--cui-bg-strong-pressed); transform:scale(.98); }
 
@@ -1083,10 +1101,40 @@ function renderQueue(){
    pending tables — shown after the last order card. */
 function grandTotalHTML(entries){
   const allItems = entries.flatMap(([, o]) => o.items || []);
-  const tables = entries.length;
-  const inner = prepSummaryHTML(allItems, `All tables — total prep (${tables} ${tables === 1 ? "order" : "orders"})`, "prep-grand");
-  if(!inner) return "";
-  return `<div class="grand-total">${inner}</div>`;
+  if(allItems.length === 0) return "";
+  const orders = entries.length;
+
+  // Every dish/drink to make, added up across all pending tables
+  // (e.g. 3× Pancake Bouquet, 2× Power Bowl), most first.
+  const counts = new Map();
+  allItems.forEach(it => counts.set(it.name, (counts.get(it.name) || 0) + (Number(it.qty) || 0)));
+  const dishRows = [...counts.entries()]
+    .sort((a,b)=> b[1] - a[1] || a[0].localeCompare(b[0]));
+  const totalUnits = dishRows.reduce((sum, [,n]) => sum + n, 0);
+
+  // Ingredient totals (eggs, mushroom…) — only exist for dishes that
+  // have a recipe profile, so this part is skipped on e.g. drinks.
+  const ingredients = prepSummaryHTML(allItems, "Ingredients", "prep-grand-sub");
+
+  return `
+    <div class="grand-total">
+      <div class="prep-summary prep-grand">
+        <div class="prep-title">${ICON_LIST}<span>All tables — to make (${orders} ${orders === 1 ? "order" : "orders"})</span></div>
+        <div class="prep-grid">
+          ${dishRows.map(([name, n]) => `
+            <div class="prep-row">
+              <span class="prep-label">${escapeHtml(name)}</span>
+              <span class="prep-value">×${n}</span>
+            </div>`).join("")}
+          <div class="prep-row grand-sum">
+            <span class="prep-label">Total items</span>
+            <span class="prep-value">${totalUnits}</span>
+          </div>
+        </div>
+        ${ingredients}
+      </div>
+    </div>
+  `;
 }
 
 function markDone(key){
