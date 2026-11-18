@@ -317,6 +317,15 @@
     line-height:1.5;
     color:var(--cui-fg-normal);
   }
+  .fb-error{
+    max-width:none;
+    margin:0;
+    border-radius:0;
+    border-width:0 0 1px;
+    background:var(--cui-bg-danger);
+    border-color:var(--cui-border-danger);
+  }
+  .fb-error strong{ color:var(--cui-fg-danger) !important; }
   .config-warning strong{ color:var(--cui-fg-warning); font-weight:var(--cui-font-weight-semibold); }
   .config-warning code{
     background:var(--cui-bg-normal);
@@ -338,6 +347,19 @@
     border-bottom:1px solid var(--cui-border-divider);
   }
   .kd-station-badge{ display:flex; align-items:center; gap:10px; }
+  .kd-top-right{ display:flex; align-items:center; gap:var(--cui-spacings-byte); }
+  /* Circuit Badge — success when live, warning while reconnecting */
+  .live-badge{
+    font-size:0.6875rem;
+    line-height:1rem;
+    font-weight:var(--cui-font-weight-semibold);
+    padding:2px 8px;
+    border-radius:var(--cui-border-radius-byte);
+    background:var(--cui-bg-warning);
+    color:var(--cui-fg-warning);
+    white-space:nowrap;
+  }
+  .live-badge.is-live{ background:var(--cui-bg-success); color:var(--cui-fg-success); }
   .kd-station-badge .icon{ font-size:24px; }
   .kd-station-badge .name{
     font-weight:var(--cui-font-weight-bold);
@@ -377,8 +399,8 @@
     border:var(--cui-border-width-mega) solid var(--cui-border-subtle);
     border-radius:var(--cui-border-radius-mega);
     padding:16px 16px 14px;
-    animation:card-in .25s ease;
   }
+  .order-card.is-new{ animation:card-in .25s ease; }
   @keyframes card-in{
     from{ opacity:0; transform:translateY(8px); }
     to{ opacity:1; transform:translateY(0); }
@@ -574,7 +596,10 @@
       <span class="icon" id="activeStationIcon">🥞</span>
       <span class="name" id="activeStationName">Station</span>
     </div>
-    <button class="switch-station-btn" id="switchStationBtn">Switch station</button>
+    <div class="kd-top-right">
+      <span class="live-badge" id="liveBadge">Connecting…</span>
+      <button class="switch-station-btn" id="switchStationBtn">Switch station</button>
+    </div>
   </header>
   <main class="kd-main">
     <div class="queue-grid" id="queueGrid"></div>
@@ -742,6 +767,25 @@ const configWarning = document.getElementById("configWarning");
 
 if(!firebaseReady) configWarning.style.display = "block";
 
+/* Shows WHY the kitchen can't read orders (most often: the Firebase
+   Realtime Database rules expired or deny access) instead of silently
+   showing an empty queue. */
+function showFirebaseError(err){
+  console.error("Firebase read failed:", err);
+  const msg = String(err && (err.code || err.message) || err);
+  let box = document.getElementById("fbErrorBox");
+  if(!box){
+    box = document.createElement("div");
+    box.id = "fbErrorBox";
+    box.className = "config-warning fb-error";
+    document.body.prepend(box);
+  }
+  box.innerHTML = `<strong>Can't read orders from Firebase:</strong> ${msg}.` +
+    (/permission/i.test(msg)
+      ? ` Your Realtime Database rules are blocking access — open Firebase Console → Realtime Database → Rules and allow read/write on <code>stationOrders</code>.`
+      : ` Check this phone's internet connection.`);
+}
+
 let currentStation = null;
 let activeListenerRef = null;
 let ordersCache = {}; // key -> orderData, for the currently open station
@@ -757,7 +801,7 @@ if(firebaseReady){
       const pending = Object.values(val).filter(o=>o.status==="pending").length;
       const el = document.querySelector(`.pending-count[data-count="${stationId}"]`);
       if(el) el.textContent = pending;
-    });
+    }, showFirebaseError);
   });
 }
 
@@ -768,7 +812,7 @@ document.getElementById("switchStationBtn").addEventListener("click", goToStatio
 
 function selectStation(stationId){
   currentStation = stationId;
-  localStorage.setItem("kdsStation", stationId); // survives the auto-refresh below
+  localStorage.setItem("kdsStation", stationId); // survives a page reload
   const meta = STATIONS[stationId];
   document.getElementById("activeStationIcon").textContent = meta.icon;
   document.getElementById("activeStationName").textContent = meta.name;
@@ -778,6 +822,8 @@ function selectStation(stationId){
 
   ordersCache = {};
   hasLoadedInitial = false;
+  lastQueueHTML = "";
+  renderedKeys = new Set();
   queueGrid.innerHTML = "";
 
   if(activeListenerRef) activeListenerRef.off();
@@ -787,17 +833,19 @@ function selectStation(stationId){
   }
 
   activeListenerRef = db.ref("stationOrders/"+stationId);
-  activeListenerRef.on("value", (snap)=>{
-    const val = snap.val() || {};
-    const wasEmpty = Object.keys(ordersCache).length === 0;
-    const newKeys = Object.keys(val).filter(k=>!(k in ordersCache) && val[k].status==="pending");
-    ordersCache = val;
-    renderQueue();
-    if(hasLoadedInitial && newKeys.length > 0 && !wasEmpty){
-      playChime();
-    }
-    hasLoadedInitial = true;
-  });
+  activeListenerRef.on("value", applySnapshot, showFirebaseError);
+}
+
+function applySnapshot(snap){
+  const val = snap.val() || {};
+  const wasEmpty = Object.keys(ordersCache).length === 0;
+  const newKeys = Object.keys(val).filter(k=>!(k in ordersCache) && val[k].status==="pending");
+  ordersCache = val;
+  renderQueue();
+  if(hasLoadedInitial && newKeys.length > 0 && !wasEmpty){
+    playChime();
+  }
+  hasLoadedInitial = true;
 }
 
 function goToStationSelect(){
@@ -809,7 +857,7 @@ function goToStationSelect(){
 }
 
 function renderEmpty(msg){
-  queueGrid.innerHTML = `<div class="kd-empty" style="grid-column:1/-1;"><span class="big">🧾</span><div class="msg">${msg}</div></div>`;
+  setQueueHTML(`<div class="kd-empty" style="grid-column:1/-1;"><span class="big">🧾</span><div class="msg">${msg}</div></div>`);
 }
 
 function ageClass(createdAt){
@@ -825,6 +873,20 @@ function ageLabel(createdAt){
   return mins + " min";
 }
 
+let lastQueueHTML = "";
+let renderedKeys = new Set();
+function setQueueHTML(html){
+  // Skip identical re-renders entirely — this is what stops the screen
+  // blinking; and replacing only the grid's contents never moves the
+  // page's scroll position.
+  if(html === lastQueueHTML) return;
+  lastQueueHTML = html;
+  queueGrid.innerHTML = html;
+  queueGrid.querySelectorAll(".oc-done-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=> markDone(btn.dataset.key));
+  });
+}
+
 function renderQueue(){
   const entries = Object.entries(ordersCache)
     .filter(([key, o]) => o.status === "pending")
@@ -832,11 +894,13 @@ function renderQueue(){
 
   if(entries.length === 0){
     renderEmpty("All caught up — no pending orders for this station.");
+    renderedKeys = new Set();
     return;
   }
 
-  queueGrid.innerHTML = entries.map(([key, o])=>{
-    const cls = ageClass(o.createdAt);
+  const firstPaint = renderedKeys.size === 0 && lastQueueHTML === "";
+  const html = entries.map(([key, o])=>{
+    const cls = ageClass(o.createdAt) + (!firstPaint && !renderedKeys.has(key) ? " is-new" : "");
     const itemsHtml = (o.items||[]).map(it=>{
       const modsHtml = (it.mods && it.mods.length) ? `<div class="mods">${it.mods.join(" · ")}</div>` : "";
       const noteHtml = it.note ? `<div class="note">📝 ${escapeHtml(it.note)}</div>` : "";
@@ -865,9 +929,15 @@ function renderQueue(){
     `;
   }).join("");
 
-  queueGrid.querySelectorAll(".oc-done-btn").forEach(btn=>{
-    btn.addEventListener("click", ()=> markDone(btn.dataset.key));
-  });
+  // A card counts as "new" (slide-in animation) only on the render where
+  // it first appears — later re-renders keep it still.
+  setQueueHTML(html);
+  // After the animation has played once, drop the class so the next
+  // re-render's HTML matches and nothing replays.
+  renderedKeys = new Set(entries.map(([k])=>k));
+  if(/ is-new/.test(html)){
+    setTimeout(()=> renderQueue(), 400);
+  }
 }
 
 function markDone(key){
@@ -906,14 +976,44 @@ function playChime(){
 setInterval(()=>{ if(currentStation) renderQueue(); }, 15000);
 
 /* ---------------------------------------------------------------
-   AUTO-REFRESH — reloads the whole page every 3s as a safety net,
-   in case the live Firebase listener stalls (flaky kitchen WiFi,
-   phone screen sleeping, etc.) and new orders stop appearing.
-   The chosen station is remembered (see selectStation) so the
-   reload lands straight back on the same queue instead of the
-   station-select screen.
+   SILENT SAFETY NET (replaces the old full-page reload, which made the
+   screen blink and jump back to the top every few seconds).
+   · Every 4s it quietly re-reads this station's orders straight from
+     Firebase and updates only what changed — no reload, no blink, the
+     scroll position stays where the cook left it.
+   · When the phone wakes up / the tab comes back, or the connection
+     drops, it forces Firebase to reconnect and re-reads immediately.
+   · The header badge shows "Live" when connected, so a stalled
+     connection is visible instead of silently missing orders.
 --------------------------------------------------------------- */
-setInterval(()=>{ location.reload(); }, 3000);
+function pollStationOnce(){
+  if(!firebaseReady || !currentStation || !activeListenerRef) return;
+  activeListenerRef.once("value").then(applySnapshot).catch(showFirebaseError);
+}
+setInterval(pollStationOnce, 4000);
+
+function forceReconnect(){
+  if(!firebaseReady) return;
+  try{ db.goOffline(); db.goOnline(); }catch(e){}
+  pollStationOnce();
+}
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) forceReconnect(); });
+window.addEventListener("online", forceReconnect);
+window.addEventListener("pageshow", (e)=>{ if(e.persisted) forceReconnect(); });
+
+if(firebaseReady){
+  const liveBadge = document.getElementById("liveBadge");
+  let offlineSince = null;
+  db.ref(".info/connected").on("value", (snap)=>{
+    const live = snap.val() === true;
+    liveBadge.textContent = live ? "● Live" : "Reconnecting…";
+    liveBadge.classList.toggle("is-live", live);
+    if(live){ offlineSince = null; pollStationOnce(); }
+    else if(!offlineSince){ offlineSince = Date.now(); }
+  });
+  // If it's been disconnected for more than 20s, kick the connection.
+  setInterval(()=>{ if(offlineSince && Date.now() - offlineSince > 20000){ offlineSince = Date.now(); forceReconnect(); } }, 5000);
+}
 
 /* ---------------------------------------------------------------
    INIT — if this phone already picked a station before (saved in
