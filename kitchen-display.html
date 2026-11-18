@@ -491,6 +491,34 @@
     cursor:pointer;
     transition:background-color var(--cui-transitions-default);
   }
+  .oc-done-btn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:var(--cui-spacings-byte);
+  }
+  /* Circuit tertiary button with chevron */
+  .oc-toggle{
+    display:flex;
+    align-items:center;
+    gap:var(--cui-spacings-bit);
+    width:100%;
+    background:none;
+    border:none;
+    padding:var(--cui-spacings-byte) 0;
+    margin:0 0 var(--cui-spacings-byte);
+    font-family:var(--cui-font-stack-default);
+    font-weight:var(--cui-font-weight-semibold);
+    font-size:var(--cui-body-s-font-size);
+    line-height:var(--cui-body-s-line-height);
+    color:var(--cui-fg-subtle);
+    cursor:pointer;
+    border-top:1px solid var(--cui-border-divider);
+    transition:color var(--cui-transitions-default);
+  }
+  .oc-toggle:hover{ color:var(--cui-fg-normal); }
+  .oc-toggle[aria-expanded="false"]{ margin-bottom:0; }
+  .oc-details[hidden]{ display:none; }
   .oc-done-btn:hover{ background:var(--cui-bg-strong-hovered); }
   .oc-done-btn:active{ background:var(--cui-bg-strong-pressed); transform:scale(.98); }
 
@@ -502,6 +530,9 @@
     margin-bottom:12px;
   }
   .prep-title{
+    display:flex;
+    align-items:center;
+    gap:var(--cui-spacings-byte);
     font-weight:var(--cui-font-weight-semibold);
     font-size:var(--cui-compact-s-font-size);
     line-height:var(--cui-compact-s-line-height);
@@ -523,12 +554,16 @@
     line-height:var(--cui-body-s-line-height);
     color:var(--cui-fg-normal);
   }
+  /* Bigger, bold values so the cook can read totals at a glance */
   .prep-value{
-    font-weight:var(--cui-font-weight-semibold);
+    font-weight:var(--cui-font-weight-bold);
     font-variant-numeric:tabular-nums;
-    font-size:var(--cui-body-s-font-size);
+    font-size:var(--cui-compact-l-font-size);
+    line-height:var(--cui-compact-l-line-height);
     color:var(--cui-fg-normal);
+    white-space:nowrap;
   }
+  .prep-row{ gap:var(--cui-spacings-kilo); }
   .prep-note{
     font-size:var(--cui-compact-s-font-size);
     line-height:var(--cui-compact-s-line-height);
@@ -718,6 +753,11 @@ function computePrepSummary(items){
   return {...totals, hasEstimate};
 }
 
+const ICON_LIST = '<svg class="cui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path fill="currentColor" d="M3.01 18a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2zM21 18a1 1 0 1 1 0 2H7v-2zM3.01 11a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2zM21 11a1 1 0 1 1 0 2H7v-2zM3.01 4a1 1 0 0 1 0 2H3a1 1 0 0 1 0-2zM21 4a1 1 0 1 1 0 2H7V4z"/></svg>';
+const ICON_CHECK = '<svg class="cui-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path fill="currentColor" d="m9.55 15.15 8.475-8.475q.3-.3.7-.3t.7.3.3.713q0 .411-.3.712l-9.175 9.2q-.3.3-.7.3a.96.96 0 0 1-.7-.3L4.55 13a.93.93 0 0 1-.288-.713 1.02 1.02 0 0 1 .313-.712q.3-.3.712-.3.413 0 .713.3z"/></svg>';
+const ICON_CHEVRON_DOWN = '<svg class="cui-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path fill="currentColor" d="M11.528 6.528a.667.667 0 0 1 .944.944l-4 4a.667.667 0 0 1-.944 0l-4-4a.667.667 0 0 1 .944-.944L8 10.057z"/></svg>';
+const ICON_CHEVRON_UP = '<svg class="cui-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path fill="currentColor" d="M7.633 5.443a.67.67 0 0 1 .839.085l4 4a.667.667 0 0 1-.944.944L8 6.943l-3.528 3.529a.667.667 0 0 1-.944-.944l4-4z"/></svg>';
+
 function prepSummaryHTML(items){
   const t = computePrepSummary(items);
   const rows = [
@@ -733,7 +773,7 @@ function prepSummaryHTML(items){
 
   return `
     <div class="prep-summary">
-      <div class="prep-title">🧮 Prep summary</div>
+      <div class="prep-title">${ICON_LIST}<span>Prep summary</span></div>
       <div class="prep-grid">
         ${rows.map(([label,val,suffix])=>`
           <div class="prep-row">
@@ -885,6 +925,27 @@ function setQueueHTML(html){
   queueGrid.querySelectorAll(".oc-done-btn").forEach(btn=>{
     btn.addEventListener("click", ()=> markDone(btn.dataset.key));
   });
+  queueGrid.querySelectorAll(".oc-toggle").forEach(btn=>{
+    btn.addEventListener("click", ()=> toggleCard(btn.dataset.key));
+  });
+}
+
+/* Collapse/expand a card's prep summary + "Mark prepared" button.
+   Remembered per order on this phone, so live updates and the
+   background check never re-open a card the cook folded away. */
+let collapsedCards = new Set();
+try{ collapsedCards = new Set(JSON.parse(localStorage.getItem("kdsCollapsed") || "[]")); }catch(e){}
+function saveCollapsed(){
+  // keep only orders that still exist, so the list never grows forever
+  const live = Object.keys(ordersCache || {});
+  collapsedCards = new Set([...collapsedCards].filter(k => live.includes(k)));
+  try{ localStorage.setItem("kdsCollapsed", JSON.stringify([...collapsedCards])); }catch(e){}
+}
+function toggleCard(key){
+  if(collapsedCards.has(key)) collapsedCards.delete(key);
+  else collapsedCards.add(key);
+  saveCollapsed();
+  renderQueue();
 }
 
 function renderQueue(){
@@ -923,8 +984,13 @@ function renderQueue(){
           <div class="oc-age">${ageLabel(o.createdAt)}</div>
         </div>
         <div class="oc-items">${itemsHtml}</div>
-        ${prepSummaryHTML(o.items)}
-        <button class="oc-done-btn" data-key="${key}">✅ Mark prepared</button>
+        <button class="oc-toggle" data-key="${key}" aria-expanded="${collapsedCards.has(key) ? "false" : "true"}">
+          ${collapsedCards.has(key) ? ICON_CHEVRON_DOWN + "<span>Show prep & done</span>" : ICON_CHEVRON_UP + "<span>Hide prep & done</span>"}
+        </button>
+        <div class="oc-details"${collapsedCards.has(key) ? " hidden" : ""}>
+          ${prepSummaryHTML(o.items)}
+          <button class="oc-done-btn" data-key="${key}">${ICON_CHECK}<span>Mark prepared</span></button>
+        </div>
       </div>
     `;
   }).join("");
